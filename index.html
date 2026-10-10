@@ -337,9 +337,10 @@ const CHARS = {
         again: 'Dad asked me to help with the nets on Sunday. Like nothing\'s wrong. For him, nothing is.',
         note: 'His dad laughed at a joke about two men. Theo laughed along and has felt sick ever since.' },
       { line: 'Ellis asked me to his sister\'s wedding. As his partner, in front of everyone. I want to say yes so badly. But if I go, I might lose Dad. And if I don\'t, I lose a piece of me. ...What would you do?',
-        again: 'The wedding\'s in three weeks. I\'ve typed "yes" to Ellis four times and deleted it four times.',
+        again: 'The wedding\'s in three weeks. I\'ve typed "yes" to Ellis four times and deleted it four times. Seriously, what would you do?',
+        asks: true,
         note: 'Ellis invited him to a wedding as his partner. Theo feels caught between Ellis and his dad.' },
-      { line: 'You didn\'t tell me what to do. You just let me say it out loud. ...I\'m saying yes to Ellis. And I\'ll tell Dad. Not today, but soon, on my own terms. Here. My lucky lure. I don\'t think I need the luck right now.',
+      { line: 'Thanks for being straight with me. And for hearing all of it first. ...I\'m saying yes to Ellis. And I\'ll tell Dad. Not today, but soon, on my own terms. Here. My lucky lure. I don\'t think I need the luck right now.',
         note: 'Theo is saying yes to Ellis, and plans to tell his dad soon. He gave you his lucky lure.' },
     ],
     greetBack: 'Hey. Sorry, I\'m miles away today.', repeat: 'Sorry, I mumble. ',
@@ -1539,7 +1540,8 @@ Pick exactly one outcome.
 - "neutral": a plain greeting or polite hello, or a request for ${c.name} to repeat or clarify what they said ("sorry, what was that?", "can you say that again?"). These are fine and normal, so they are not failures, but they earn no trust. A request to repeat or clarify is NEVER "listened", even when it is phrased as a question.
 - "missed": the reply gives advice or tries to fix things, minimises or silver-lines ("at least...", "everything happens for a reason"), turns the talk to the player's own story, judges, changes the subject, is small talk that ignores what was said, could have been said to anyone, or is a bare "ok" or "cool".
 - "harmful": the reply is mocking, cruel or prejudiced.
-${OPINION_RULE[s](c.name)}
+${OPINION_RULE[s](c.name)}${c.beats[s].asks ? `
+IMPORTANT: ${c.name} has asked the player directly what they would do. A good listener answers that question. "listened" means the player gives an honest, kind answer (whichever way it leans, and "I honestly don't know, but..." counts) while showing they understand how hard this is for ${c.name}; use skill "opinion". Dodging the question, ignoring it, or only turning it back with another question is "missed", and the coach should encourage the player to answer honestly.` : ''}
 
 WHAT ${c.name.toUpperCase()} SAYS NEXT
 1 to 4 short sentences, plain text, in ${c.name}'s voice, with no stage directions and no surrounding quotation marks. Never lecture the player about listening.
@@ -1631,6 +1633,21 @@ function judgeLocal(c, v, text) {
   if (words.length < 4) { issues.push('short'); score -= 2; }
 
   const repeatAsk = isRepeatRequest(text);
+  // When the villager has asked the player directly what they'd do, an honest answer is the listening move.
+  if (c.beats[s].asks && !harmful && !repeatAsk) {
+    const answers = /(i'?d |i would|if i were you|in your shoes|i think|honestly|my (honest )?(take|opinion|guess)|say yes|i'?m not sure|i don'?t know)/.test(t);
+    const ok = answers && words.length >= 6 && !issues.includes('minimize');
+    return {
+      listened: ok, neutral: false, harmful: false, source: 'local',
+      skills: ok ? ['opinion', ...skills.filter(k => k !== 'opinion' && k !== 'open_q')].filter((k, i, a) => a.indexOf(k) === i).slice(0, 4) : [],
+      coach: ok
+        ? `You answered ${c.name}'s question honestly. At this level of trust, that's what was needed.`
+        : answers
+          ? `Say a little more. Tell ${c.name} what you'd do, and show you understand why it's so hard.`
+          : `${c.name} asked you directly. At this level of trust, answer honestly and kindly, like: "Honestly? I think I'd go. But I get why it's so scary."`,
+      reply: scriptedReply(c, v, ok ? 'listened' : 'missed', text),
+    };
+  }
   const greeting = isGreeting(text) && words.length <= 8 && score < 2;
   if (!harmful && (repeatAsk || greeting)) {
     return {
