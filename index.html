@@ -77,6 +77,12 @@ button{cursor:pointer}
 .fb.warm{border-color:var(--sprout)}
 .fb.cool{border-color:var(--honey)}
 .fb.hurt{border-color:var(--heart)}
+.fb.neutral{border-color:#6f6880}
+.fb.neutral .fb-head{color:var(--mute)}
+.log{max-height:40vh;overflow:auto}
+.log p{margin:0 0 6px}
+.log b{color:var(--honey);font-weight:600}
+.log .you b{color:var(--sprout)}
 .fb-head{display:flex;align-items:center;gap:8px;font-family:var(--f-tag);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
 .fb.warm .fb-head{color:var(--sprout)}
 .fb.cool .fb-head{color:var(--honey)}
@@ -190,6 +196,7 @@ button{cursor:pointer}
 
   <div id="talk" hidden>
     <div class="tips" id="tips" hidden></div>
+    <div class="tips log" id="log" hidden></div>
     <div class="fb" id="feedback" hidden></div>
     <div class="box" id="box">
       <canvas class="portrait" id="portrait" width="24" height="20"></canvas>
@@ -205,6 +212,7 @@ button{cursor:pointer}
           <textarea id="reply" rows="2" maxlength="500" placeholder="Type what you'd say back..."></textarea>
           <div class="row">
             <span class="keyhint grow">Enter to say it · Esc to walk away</span>
+            <button class="btn" type="button" id="btnLog">Look back</button>
             <button class="btn" type="button" id="btnTips">Tips</button>
             <button class="btn" type="button" id="btnLeave">Walk away</button>
             <button class="btn primary" type="submit" id="btnSend">Say it</button>
@@ -303,6 +311,7 @@ const CHARS = {
       { line: '...There. Look at me, flour and tears everywhere. Thank you for not trying to fix it. Here, take a loaf. It\'s still wrong. But it\'s hers, and I\'d like you to have it.',
         note: 'Marisol finally let herself cry. She gave you a loaf of Rosa\'s rye.' },
     ],
+    greetBack: 'Hello, love. Sorry, I\'m in a muddle over this rye.', repeat: 'Oh, sorry, love. ',
     guarded: ['Mm. Well. Bread won\'t bake itself.', 'Right. Can I get you anything, love? A bun?', 'That\'s kind. I should check the oven.'],
     hurt: 'I think I\'d best get back to the ovens. Mind the door on your way out.',
     after: ['Morning, love. The rye\'s a little better. Or I\'m a little better. Hard to say.', 'I went up to Mum\'s garden yesterday and sat there a whole hour. Thank you.'],
@@ -333,6 +342,7 @@ const CHARS = {
       { line: 'You didn\'t tell me what to do. You just let me say it out loud. ...I\'m saying yes to Ellis. And I\'ll tell Dad. Not today, but soon, on my own terms. Here. My lucky lure. I don\'t think I need the luck right now.',
         note: 'Theo is saying yes to Ellis, and plans to tell his dad soon. He gave you his lucky lure.' },
     ],
+    greetBack: 'Hey. Sorry, I\'m miles away today.', repeat: 'Sorry, I mumble. ',
     guarded: ['Yeah. Anyway. Hope the weather holds.', 'Ha. Sure. It\'s nothing, really.', 'Mm. I should probably reel in.'],
     hurt: '...Right. I\'m gonna head in. See you around.',
     after: ['Ellis says hi. Well, he says hi to "the one who listened." That\'s you.', 'Fish are biting again. Funny how that works.'],
@@ -363,6 +373,7 @@ const CHARS = {
       { line: 'You know, everyone I\'ve told says "Well, be careful, June." You\'re the first person who just let me be happy. Take a jar of this year\'s honey. I\'m going to make Pip a tiny beekeeper\'s hat!',
         note: 'June let herself be happy. She gave you a jar of honey and is making Pip a beekeeper\'s hat.' },
     ],
+    greetBack: 'Hello to you too, dear! Forgive me, I\'m all a-flutter today.', repeat: 'Oh, I do ramble! ',
     guarded: ['Ha! Well, never mind me. How are you settling in, dear?', 'Oh, it\'s nothing. Have you seen the bees? Look at them go!', 'Mm, yes. Anyway! Lovely weather.'],
     hurt: 'Oh. Well. I\'d best see to the hives. Good day, dear.',
     after: ['Pip\'s hat fits! Well, it\'s enormous. She loves it.', 'Cora and I walked the whole garden yesterday. Slowly. It was perfect.'],
@@ -1286,7 +1297,7 @@ function lowNote() { tone(196, 0.3, 0.03, 'triangle'); }
    ============================================================ */
 const ui = {
   talk: $('#talk'), text: $('#talkText'), name: $('#talkName'), hearts: $('#hearts'), portrait: $('#portrait'),
-  form: $('#replyForm'), input: $('#reply'), more: $('#more'), fb: $('#feedback'), tips: $('#tips'), label: $('#replyLabel'),
+  form: $('#replyForm'), input: $('#reply'), more: $('#more'), fb: $('#feedback'), tips: $('#tips'), label: $('#replyLabel'), log: $('#log'),
 };
 let typing = null, waitCont = null, convo = null, thinkCtl = null, thinkTimer = null;
 
@@ -1333,7 +1344,7 @@ function openBox({ name, look, stage }) {
   for (const k in keys) keys[k] = false;
   $('#hint').hidden = true; hintText = '';
   $('#touch').hidden = true;
-  ui.talk.hidden = false; ui.fb.hidden = true; ui.tips.hidden = true; ui.form.hidden = true;
+  ui.talk.hidden = false; ui.fb.hidden = true; ui.tips.hidden = true; ui.log.hidden = true; ui.form.hidden = true;
   ui.name.textContent = name || '';
   ui.name.hidden = !name;
   ui.portrait.hidden = !look;
@@ -1384,6 +1395,7 @@ async function startTalk(n) {
   else if (!v.met) { v.met = true; line = c.beats[0].line; }
   else line = c.beats[v.stage].again;
   v.turns = [{ who: 'npc', text: line }];
+  v.lastLine = line;
   save();
   await say(line, c.voice);
   if (convo !== me) return;
@@ -1404,7 +1416,17 @@ ui.input.addEventListener('keydown', e => {
 });
 ui.form.addEventListener('submit', e => { e.preventDefault(); sendReply(ui.input.value); });
 $('#btnLeave').addEventListener('click', closeTalk);
-$('#btnTips').addEventListener('click', () => { ui.tips.hidden = !ui.tips.hidden; });
+$('#btnTips').addEventListener('click', () => { ui.tips.hidden = !ui.tips.hidden; ui.log.hidden = true; });
+$('#btnLog').addEventListener('click', () => {
+  if (!convo || convo.kind !== 'npc') return;
+  if (ui.log.hidden) {
+    const c = CHARS[convo.id], v = state.v[convo.id];
+    ui.log.innerHTML = '<h3>This conversation so far</h3>' + v.turns.slice(-12).map(t =>
+      `<p class="${t.who === 'you' ? 'you' : ''}"><b>${t.who === 'you' ? 'You' : esc(c.name)}:</b> ${esc(t.text)}</p>`).join('');
+    ui.log.hidden = false; ui.tips.hidden = true;
+    ui.log.scrollTop = ui.log.scrollHeight;
+  } else ui.log.hidden = true;
+});
 function renderTips(stage) {
   ui.tips.innerHTML = `<h3>How to listen</h3>${MOVES_HTML}<p class="trust-note">${'&#9829;'.repeat(stage) || 'No hearts yet'}: ${esc(TRUST_TIPS[stage])}</p>`;
 }
@@ -1414,7 +1436,7 @@ async function sendReply(raw) {
   if (!convo || convo.kind !== 'npc' || convo.phase !== 'input' || !text) return;
   const me = convo, c = CHARS[me.id], v = state.v[me.id];
   me.phase = 'thinking';
-  ui.form.hidden = true; ui.tips.hidden = true; ui.fb.hidden = true;
+  ui.form.hidden = true; ui.tips.hidden = true; ui.log.hidden = true; ui.fb.hidden = true;
   v.turns.push({ who: 'you', text });
   let dots = 0;
   ui.text.classList.add('thinking');
@@ -1435,6 +1457,7 @@ async function sendReply(raw) {
   else if (r.harmful) lowNote();
   v.coach = r.coach;
   v.turns.push({ who: 'npc', text: r.reply });
+  if (!r.neutral) v.lastLine = r.reply;
   ui.hearts.innerHTML = heartsHTML(v.stage, r.listened ? v.stage - 1 : -1);
   showFeedback(r, c);
   save();
@@ -1456,8 +1479,8 @@ async function sendReply(raw) {
 
 function showFeedback(r, c) {
   const fb = ui.fb;
-  fb.className = 'fb ' + (r.harmful ? 'hurt' : r.listened ? 'warm' : 'cool');
-  const head = r.harmful ? `${c.name} is hurt` : r.listened ? `${c.name} opens up` : `${c.name} holds back`;
+  fb.className = 'fb ' + (r.harmful ? 'hurt' : r.listened ? 'warm' : r.neutral ? 'neutral' : 'cool');
+  const head = r.harmful ? `${c.name} is hurt` : r.listened ? `${c.name} opens up` : r.neutral ? 'No change in trust' : `${c.name} holds back`;
   let html = `<div class="fb-head">${r.listened ? HEART : ''}<span>${esc(head)}</span>${r.source === 'local' ? '<span style="opacity:.6">· scripted</span>' : ''}</div>`;
   if (r.skills.length) html += `<div class="chips">${r.skills.map(s => `<span class="chip">${esc(SKILLS[s])}</span>`).join('')}</div>`;
   if (state.coach && r.coach) html += `<p class="coach">${esc(r.coach)}</p>`;
@@ -1511,16 +1534,23 @@ THE PLAYER'S REPLY
 """${text}"""
 
 HOW TO JUDGE
-Pass ("listened": true) when the reply shows real attention to what ${c.name} said or feels, even if it's clumsy: reflecting it back in their own words, naming or validating a feeling, a gentle open question about ${c.name}'s experience, or simply staying with them.
-Fail when the reply: gives advice or tries to fix things, minimises or silver-lines ("at least...", "everything happens for a reason"), turns the talk to the player's own story, judges, changes the subject, is small talk that ignores what was said, could have been said to anyone, or is a bare "ok" or "cool".
+Pick exactly one outcome.
+- "listened": the reply shows real attention to what ${c.name} said or feels, even if it's clumsy: reflecting it back in the player's own words, naming or validating a feeling, a gentle open question about ${c.name}'s experience, or simply staying with them.
+- "neutral": a plain greeting or polite hello, or a request for ${c.name} to repeat or clarify what they said ("sorry, what was that?", "can you say that again?"). These are fine and normal, so they are not failures, but they earn no trust. A request to repeat or clarify is NEVER "listened", even when it is phrased as a question.
+- "missed": the reply gives advice or tries to fix things, minimises or silver-lines ("at least...", "everything happens for a reason"), turns the talk to the player's own story, judges, changes the subject, is small talk that ignores what was said, could have been said to anyone, or is a bare "ok" or "cool".
+- "harmful": the reply is mocking, cruel or prejudiced.
 ${OPINION_RULE[s](c.name)}
-Mocking, cruel or prejudiced replies are harmful: set "trust" to -1.
 
 WHAT ${c.name.toUpperCase()} SAYS NEXT
-1 to 4 short sentences, plain text, in ${c.name}'s voice, with no stage directions and no surrounding quotation marks. If the player listened, ${c.name} warms up and shares the text above in their own words, keeping its key facts and names. If not, ${c.name} answers believably but guardedly and shares nothing new. If harmful, ${c.name} politely ends the conversation. Never lecture the player about listening.
+1 to 4 short sentences, plain text, in ${c.name}'s voice, with no stage directions and no surrounding quotation marks. Never lecture the player about listening.
+- listened: ${c.name} warms up and shares the text above in their own words, keeping its key facts and names.
+- neutral, greeting: ${c.name} greets the player back warmly, then gently returns to what's on their mind, in fresh words, without sharing anything new.
+- neutral, repeat or clarify: ${c.name} repeats or rephrases their own last line, without sharing anything new.
+- missed: ${c.name} answers believably but guardedly and shares nothing new.
+- harmful: ${c.name} politely ends the conversation.
 
 Reply with only this JSON:
-{"listened": true or false, "trust": 1 or 0 or -1, "skills": [zero or more of "reflect","feeling","open_q","validate","present","share","opinion"], "coach": "one warm, specific sentence for the player, at most 30 words: if they passed, what worked; if not, one thing to try, with a short example phrase", "reply": "what ${c.name} says"}`;
+{"outcome": "listened" or "neutral" or "missed" or "harmful", "skills": [only when listened: one or more of "reflect","feeling","open_q","validate","present","share","opinion"], "coach": "one warm, specific sentence for the player, at most 30 words: if they listened, what worked; otherwise one thing to try next, with a short example phrase", "reply": "what ${c.name} says"}`;
 }
 
 async function judge(c, v, text) {
@@ -1545,21 +1575,29 @@ async function judge(c, v, text) {
   return judgeLocal(c, v, text);
 }
 
+const OUTCOMES = ['listened', 'neutral', 'missed', 'harmful'];
 function normalize(r, c, v, text) {
-  if (!r || typeof r !== 'object' || typeof r.listened !== 'boolean') return judgeLocal(c, v, text);
+  if (!r || typeof r !== 'object' || !OUTCOMES.includes(r.outcome)) return judgeLocal(c, v, text);
+  const outcome = r.outcome;
   let reply = typeof r.reply === 'string' ? r.reply.trim().replace(/^["“]+|["”]+$/g, '') : '';
-  const harmful = r.trust === -1 && !r.listened;
-  if (!reply) reply = scriptedReply(c, v, r.listened, harmful);
+  if (!reply) reply = scriptedReply(c, v, outcome, text);
   return {
-    listened: r.listened, harmful,
-    skills: (Array.isArray(r.skills) ? r.skills : []).filter(k => SKILLS[k]).filter((k, i, a) => a.indexOf(k) === i).slice(0, 4),
+    listened: outcome === 'listened', neutral: outcome === 'neutral', harmful: outcome === 'harmful',
+    skills: outcome === 'listened' ? (Array.isArray(r.skills) ? r.skills : []).filter(k => SKILLS[k]).filter((k, i, a) => a.indexOf(k) === i).slice(0, 4) : [],
     coach: String(r.coach || '').slice(0, 260), reply, source: 'claude',
   };
 }
-function scriptedReply(c, v, listened, harmful) {
-  if (harmful) return c.hurt;
-  if (listened) return c.beats[v.stage + 1].line;
+function scriptedReply(c, v, outcome, text) {
+  if (outcome === 'harmful') return c.hurt;
+  if (outcome === 'listened') return c.beats[v.stage + 1].line;
+  if (outcome === 'neutral') return isRepeatRequest(text) ? c.repeat + (v.lastLine || c.beats[v.stage].line) : c.greetBack;
   return c.guarded[(v.g++) % c.guarded.length];
+}
+function isRepeatRequest(text) {
+  return /(repeat|say (that|it|this) again|come again|what did you (say|ask|mean)|didn'?t (catch|hear|get) (that|you|it)|pardon|what was (that|the question)|one more time|say again)/i.test(text);
+}
+function isGreeting(text) {
+  return /^\s*(hi|hello|hey|hiya|howdy|yo|greetings|good (morning|afternoon|evening|day)|morning|afternoon|evening|nice to meet you)\b/i.test(text);
 }
 
 const FEEL = ['sad', 'grief', 'griev', 'hurt', 'lonely', 'alone', 'scared', 'afraid', 'fear', 'terrif', 'anxious', 'nervous', 'worr', 'guilt', 'ashamed', 'shame', 'angry', 'frustrat', 'overwhelm', 'heavy', 'heartbr', 'miss', 'happy', 'joy', 'excit', 'thrill', 'proud', 'reliev', 'hope', 'glad', 'love', 'delight', 'torn', 'conflict', 'exhaust', 'tired', 'numb', 'stuck', 'trapped', 'sick', 'pain', 'hard', 'tough', 'wonderful', 'amazing', 'beautiful', 'precious', 'brave'];
@@ -1592,6 +1630,17 @@ function judgeLocal(c, v, text) {
   }
   if (words.length < 4) { issues.push('short'); score -= 2; }
 
+  const repeatAsk = isRepeatRequest(text);
+  const greeting = isGreeting(text) && words.length <= 8 && score < 2;
+  if (!harmful && (repeatAsk || greeting)) {
+    return {
+      listened: false, neutral: true, harmful: false, skills: [], source: 'local',
+      coach: repeatAsk
+        ? 'Asking someone to repeat is fine. Once you\'ve heard it, show it landed by saying it back in your own words.'
+        : `A friendly hello is a good start. Now respond to what ${c.name} actually said, maybe by reflecting it back.`,
+      reply: scriptedReply(c, v, 'neutral', text),
+    };
+  }
   const listened = !harmful && score >= 2 && !issues.includes('minimize');
   let coach;
   if (harmful) coach = 'That landed as hurtful. Listening starts with respect for who someone is and what they feel.';
@@ -1601,7 +1650,8 @@ function judgeLocal(c, v, text) {
   else if (issues.includes('redirect')) coach = 'Keep the spotlight on them for now. Try: "What has that been like for you?"';
   else if (issues.includes('short')) coach = 'Say a little more. Echo something they told you, so they know you heard it.';
   else coach = `Pick up on something specific ${c.name} said and reflect it back in your own words, or ask about it.`;
-  return { listened, harmful, skills: listened ? skills.filter((k, i, a) => a.indexOf(k) === i).slice(0, 4) : [], coach, reply: scriptedReply(c, v, listened, harmful), source: 'local' };
+  const outcome = harmful ? 'harmful' : listened ? 'listened' : 'missed';
+  return { listened, neutral: false, harmful, skills: listened ? skills.filter((k, i, a) => a.indexOf(k) === i).slice(0, 4) : [], coach, reply: scriptedReply(c, v, outcome, text), source: 'local' };
 }
 
 function updateBadge() {
