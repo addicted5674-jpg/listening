@@ -1,0 +1,1780 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Listening</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Silkscreen&display=swap">
+<style>
+/* Layout: a full-bleed pixel village on canvas; an Undertale-style black dialogue box docked at the bottom; the journal opens as a Stardew-style wooden book. */
+:root{
+  --night:#17211c;
+  --ink:#0c0a10;
+  --chalk:#f7f3ff;
+  --mute:#a7a1b6;
+  --heart:#ff6b81;
+  --honey:#ffcc4d;
+  --sprout:#94d36b;
+  --wood:#7b4a2a;
+  --wood-hi:#b07a45;
+  --parch:#f1dca6;
+  --parch-ink:#3d2817;
+  --parch-line:#d3b77a;
+  --f-say:"Pixelify Sans","Trebuchet MS",system-ui,sans-serif;
+  --f-tag:"Silkscreen","Courier New",monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--night);color:var(--chalk);font-family:var(--f-say);font-size:16px;overflow:hidden;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--honey);outline-offset:2px}
+
+#game{position:relative;height:100%;overflow:hidden}
+#world{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
+
+/* HUD */
+.hud{position:absolute;top:12px;left:16px;right:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;pointer-events:none}
+.hud>*{pointer-events:auto}
+.tag{font-family:var(--f-tag);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.pill{background:rgba(12,10,16,.82);border:2px solid var(--chalk);padding:7px 10px;display:inline-flex;align-items:center;gap:8px}
+.hud-right{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.pill-btn{background:var(--ink);border:2px solid var(--chalk);padding:7px 10px}
+.pill-btn:hover{background:#221d2b}
+.dot{width:8px;height:8px;background:var(--mute);display:inline-block}
+.dot.live{background:var(--sprout);box-shadow:0 0 0 2px rgba(148,211,107,.25)}
+#hint{position:absolute;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);white-space:nowrap}
+#toast{position:absolute;left:50%;top:64px;transform:translateX(-50%);max-width:min(560px,calc(100% - 32px));text-align:center;background:var(--ink);border:2px solid var(--honey);color:var(--chalk);padding:10px 14px;font-size:16px;line-height:1.35}
+
+/* Dialogue */
+#talk{position:absolute;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));max-width:840px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.box{background:var(--ink);border:4px solid var(--chalk);box-shadow:0 0 0 4px var(--ink);padding:14px 16px;display:flex;gap:16px;align-items:flex-start}
+.portrait{width:96px;height:80px;flex:none;image-rendering:pixelated;border:2px solid #3a3446}
+.talk-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.talk-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#talkName{font-family:var(--f-tag);font-size:13px;letter-spacing:.1em;color:var(--honey)}
+.hearts{display:flex;gap:3px;color:#4a4256}
+.hearts svg{display:block}
+.hearts .on{color:var(--heart)}
+.hearts .pop{animation:pop .5s ease-out}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.7)}100%{transform:scale(1)}}
+#talkText{margin:0;font-size:21px;line-height:1.38;min-height:3.9em;white-space:pre-wrap;overflow-wrap:anywhere;cursor:default}
+#talkText.thinking{color:var(--mute)}
+#more{align-self:flex-end;color:var(--chalk);font-size:14px;animation:bob 1s steps(2) infinite}
+@keyframes bob{50%{transform:translateY(3px)}}
+#replyForm{display:flex;flex-direction:column;gap:8px}
+#reply{width:100%;box-sizing:border-box;resize:none;background:#1a1622;border:2px solid #5b546a;color:var(--chalk);padding:8px 10px;font-size:18px;line-height:1.35}
+#reply:focus{border-color:var(--honey);outline:none}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.row .grow{flex:1}
+.btn{background:transparent;border:2px solid var(--chalk);padding:6px 10px;font-family:var(--f-tag);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.btn:hover{background:#221d2b}
+.btn.primary{background:var(--chalk);color:var(--ink)}
+.btn.primary:hover{background:var(--honey)}
+.keyhint{color:var(--mute);font-size:13px}
+
+.fb{background:var(--ink);border:3px solid var(--mute);padding:10px 14px;display:flex;flex-direction:column;gap:6px}
+.fb.warm{border-color:var(--sprout)}
+.fb.cool{border-color:var(--honey)}
+.fb.hurt{border-color:var(--heart)}
+.fb-head{display:flex;align-items:center;gap:8px;font-family:var(--f-tag);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.fb.warm .fb-head{color:var(--sprout)}
+.fb.cool .fb-head{color:var(--honey)}
+.fb.hurt .fb-head{color:var(--heart)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--sprout);color:var(--sprout);padding:2px 7px;font-size:14px}
+.coach{margin:0;font-size:17px;line-height:1.35;color:var(--chalk)}
+
+.tips{background:var(--ink);border:3px solid var(--chalk);padding:12px 16px;font-size:17px;line-height:1.4}
+.tips h3{margin:0 0 8px;font-family:var(--f-tag);font-size:12px;letter-spacing:.1em;color:var(--honey);text-transform:uppercase}
+.moves{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.move b{display:block;color:var(--sprout);font-weight:600}
+.move i{color:var(--mute);font-style:normal}
+.trust-note{margin:10px 0 0;color:var(--honey)}
+
+/* Overlays */
+.overlay{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgba(10,8,14,.55);overflow:auto}
+.title-card{max-width:600px;width:100%;text-align:center;display:flex;flex-direction:column;gap:16px;align-items:center}
+.title-card h1{margin:0;font-family:var(--f-tag);font-weight:400;font-size:clamp(40px,11vw,76px);letter-spacing:.06em;color:var(--honey);text-shadow:4px 4px 0 var(--ink),-2px -2px 0 var(--ink),2px -2px 0 var(--ink),-2px 2px 0 var(--ink);text-wrap:balance;line-height:1}
+.title-card .sub{font-family:var(--f-tag);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--chalk);text-shadow:2px 2px 0 var(--ink)}
+.title-panel{background:var(--ink);border:4px solid var(--chalk);padding:18px;text-align:left;display:flex;flex-direction:column;gap:12px;font-size:18px;line-height:1.4;width:100%;box-sizing:border-box}
+.title-panel p{margin:0}
+.title-panel label{display:flex;flex-direction:column;gap:6px;font-size:16px;color:var(--mute)}
+.title-panel input{background:#1a1622;border:2px solid #5b546a;padding:8px 10px;font-size:18px}
+.title-panel input:focus{border-color:var(--honey);outline:none}
+.controls{display:flex;gap:14px;flex-wrap:wrap;color:var(--mute);font-size:15px}
+.kbd{border:1px solid var(--mute);padding:0 5px;color:var(--chalk);font-family:var(--f-tag);font-size:10px}
+.title-actions{display:flex;gap:10px;flex-wrap:wrap}
+.title-actions .btn{font-size:13px;padding:10px 14px}
+.fine{font-size:14px;color:var(--mute);line-height:1.4}
+
+.book{width:100%;max-width:780px;max-height:calc(100% - 8px);overflow:auto;background:var(--parch);color:var(--parch-ink);border:6px solid var(--wood);box-shadow:inset 0 0 0 3px var(--wood-hi),0 8px 0 rgba(0,0,0,.35);box-sizing:border-box}
+.book header{position:sticky;top:0;background:var(--wood);color:var(--parch);display:flex;align-items:center;gap:12px;padding:10px 14px;flex-wrap:wrap;z-index:1}
+.book h2{margin:0;font-family:var(--f-tag);font-weight:400;font-size:16px;letter-spacing:.1em;text-transform:uppercase}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.tabs button{background:transparent;border:2px solid var(--wood-hi);color:var(--parch);padding:5px 9px;font-family:var(--f-tag);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.tabs button.on{background:var(--parch);color:var(--parch-ink);border-color:var(--parch)}
+.x{background:transparent;border:2px solid var(--parch);color:var(--parch);width:34px;height:34px;font-size:16px}
+.book section{padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px;font-size:17px;line-height:1.45}
+.person{display:grid;grid-template-columns:72px 1fr;gap:14px;padding-bottom:14px;border-bottom:2px dashed var(--parch-line)}
+.person:last-child{border-bottom:0;padding-bottom:0}
+.person canvas{width:72px;height:60px;image-rendering:pixelated;border:2px solid var(--parch-ink)}
+.person .who{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.person h3{margin:0;font-size:20px;font-weight:600}
+.person .where{font-size:14px;color:#7a5a3a}
+.person ul{margin:6px 0 0;padding-left:18px}
+.person li{margin:2px 0}
+.person .hearts{color:#cdb07a}
+.person .hearts .on{color:#d6384f}
+.person .last{margin:8px 0 0;font-size:15px;color:#6b4a2c;border-left:3px solid var(--parch-line);padding-left:8px}
+.person.unknown h3{color:#9a7b55}
+.book .moves{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.book .move b{color:#3f6f2c}
+.book .move i{color:#7a5a3a}
+.avoid{background:rgba(214,56,79,.08);border:2px solid #e3a3a0;padding:10px 12px}
+.avoid b{color:#a8323f}
+.ladder{display:grid;gap:6px}
+.ladder div{display:grid;grid-template-columns:110px 1fr;gap:10px}
+.ladder span:first-child{color:#d6384f;font-family:var(--f-tag);font-size:11px;letter-spacing:.06em;padding-top:4px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{border:2px solid var(--parch-line);padding:8px 10px}
+.stat b{display:block;font-size:26px;font-variant-numeric:tabular-nums}
+.stat span{font-size:14px;color:#7a5a3a}
+.skillrow{display:grid;grid-template-columns:170px 1fr 34px;gap:10px;align-items:center}
+.bar{height:10px;background:#e6cd92;border:1px solid var(--parch-line)}
+.bar i{display:block;height:100%;background:#5e9a44}
+.skillrow em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums}
+.settings{display:flex;flex-direction:column;gap:10px}
+.settings label{display:flex;gap:10px;align-items:center}
+.settings input[type=text]{background:#fff6dc;border:2px solid var(--parch-line);padding:6px 8px;color:var(--parch-ink)}
+.book .btn{border-color:var(--parch-ink);color:var(--parch-ink)}
+.book .btn:hover{background:#e9cf94}
+.book h4{margin:4px 0 0;font-family:var(--f-tag);font-weight:400;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#7a5a3a}
+
+/* Touch controls */
+#touch{position:absolute;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none}
+.dpad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);pointer-events:auto;touch-action:none}
+.dpad button,.abtn{background:rgba(12,10,16,.7);border:2px solid var(--chalk);color:var(--chalk);font-size:18px;touch-action:none;user-select:none;-webkit-user-select:none}
+.dpad .u{grid-column:2;grid-row:1}.dpad .l{grid-column:1;grid-row:2}.dpad .r{grid-column:3;grid-row:2}.dpad .d{grid-column:2;grid-row:3}
+.abtn{width:72px;height:72px;border-radius:50%;pointer-events:auto;font-family:var(--f-tag);font-size:14px}
+
+@media (max-width:560px){
+  #toast{top:112px}
+  .portrait{width:64px;height:54px}
+  #talkText{font-size:18px}
+  .box{padding:10px 12px;gap:10px}
+  .person{grid-template-columns:56px 1fr}
+  .person canvas{width:56px;height:47px}
+  .skillrow{grid-template-columns:120px 1fr 30px}
+  .ladder div{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  #more,.hearts .pop{animation:none}
+}
+</style>
+
+<div id="game">
+  <canvas id="world" aria-label="The village of Thistlewick"></canvas>
+
+  <div class="hud" id="hud" hidden>
+    <div class="pill tag" id="place">Thistlewick</div>
+    <div class="hud-right">
+      <span class="pill tag" id="badge" title=""><i class="dot" id="badgeDot"></i><span id="badgeText">Scripted replies</span></span>
+      <button class="pill-btn tag" id="btnSound" type="button">Sound on</button>
+      <button class="pill-btn tag" id="btnJournal" type="button">Journal (J)</button>
+    </div>
+  </div>
+
+  <div class="pill tag" id="hint" hidden></div>
+  <div id="toast" role="status" hidden></div>
+
+  <div id="talk" hidden>
+    <div class="tips" id="tips" hidden></div>
+    <div class="fb" id="feedback" hidden></div>
+    <div class="box" id="box">
+      <canvas class="portrait" id="portrait" width="24" height="20"></canvas>
+      <div class="talk-main">
+        <div class="talk-top">
+          <span id="talkName"></span>
+          <span class="hearts" id="hearts"></span>
+        </div>
+        <p id="talkText" aria-live="polite"></p>
+        <span id="more" hidden>&#9660;</span>
+        <form id="replyForm" hidden autocomplete="off">
+          <label for="reply" class="keyhint" id="replyLabel">Your reply</label>
+          <textarea id="reply" rows="2" maxlength="500" placeholder="Type what you'd say back..."></textarea>
+          <div class="row">
+            <span class="keyhint grow">Enter to say it · Esc to walk away</span>
+            <button class="btn" type="button" id="btnTips">Tips</button>
+            <button class="btn" type="button" id="btnLeave">Walk away</button>
+            <button class="btn primary" type="submit" id="btnSend">Say it</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="journal" class="overlay" hidden role="dialog" aria-label="Journal">
+    <div class="book">
+      <header>
+        <h2>Journal</h2>
+        <nav class="tabs" id="tabs">
+          <button type="button" data-tab="people" class="on">Villagers</button>
+          <button type="button" data-tab="how">How to listen</button>
+          <button type="button" data-tab="me">Your listening</button>
+        </nav>
+        <button type="button" class="x" id="closeJournal" aria-label="Close journal">&#10005;</button>
+      </header>
+      <section id="tab-people"></section>
+      <section id="tab-how" hidden></section>
+      <section id="tab-me" hidden></section>
+    </div>
+  </div>
+
+  <div id="title" class="overlay">
+    <div class="title-card">
+      <h1>Listening</h1>
+      <div class="sub">A village called Thistlewick</div>
+      <div class="title-panel">
+        <p>You've just moved to Thistlewick. Everyone here is carrying something. They'll only tell you about it if you really listen.</p>
+        <p>When a villager speaks, you type your reply. Show them you heard them, and they'll trust you a little more.</p>
+        <label for="playerName">What should the villagers call you? (optional)
+          <input id="playerName" type="text" maxlength="24" placeholder="Your name">
+        </label>
+        <div class="controls">
+          <span><span class="kbd">WASD</span> / <span class="kbd">ARROWS</span> walk</span>
+          <span><span class="kbd">E</span> / <span class="kbd">SPACE</span> talk</span>
+          <span><span class="kbd">J</span> journal</span>
+        </div>
+        <div class="title-actions">
+          <button class="btn primary" type="button" id="btnBegin">Begin</button>
+          <button class="btn" type="button" id="btnReset" hidden>Start over</button>
+        </div>
+        <p class="fine" id="claudeNote">Checking whether Claude can voice the villagers...</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="touch" hidden>
+    <div class="dpad">
+      <button type="button" class="u" data-k="up" aria-label="Walk up">&#9650;</button>
+      <button type="button" class="l" data-k="left" aria-label="Walk left">&#9664;</button>
+      <button type="button" class="r" data-k="right" aria-label="Walk right">&#9654;</button>
+      <button type="button" class="d" data-k="down" aria-label="Walk down">&#9660;</button>
+    </div>
+    <button type="button" class="abtn" id="btnA" aria-label="Talk or interact">Talk</button>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ============================================================
+   STORIES — the heart of the game. Edit these freely.
+   Each villager has 6 beats. Beat 0 is how they open; each time
+   the player listens well, they share the next beat. Beat 5 is
+   how their story resolves.
+   ============================================================ */
+const CHARS = {
+  marisol: {
+    name: 'Marisol', place: 'Inside the bakery', voice: 330,
+    hint: 'The bakery on the west side smells wonderful.',
+    bio: '54, runs the Thistlewick bakery, which was her mother\'s bakery before her. Practical, warm, brisk. Keeps her hands busy so she doesn\'t have to feel.',
+    style: 'Calls people "love". Short, practical sentences. Talks about dough and ovens when feelings get close.',
+    keepsake: 'Rosa\'s rye loaf',
+    look: { skin:'#d9a27e', hair:'#3a2b2b', hair2:'#a39a98', shirt:'#b84a4a', skirt:'#9e3c3c', apron:'#f4f0e6', legs:'#d9a27e', shoe:'#4a3020', style:'bun', bg:'#3a2228' },
+    beats: [
+      { line: 'Morning, love. Mind the flour. The rye\'s not right again today. It hasn\'t been right since spring.',
+        again: 'Back again? The rye\'s still not right. Don\'t ask me why. Well. You can ask.',
+        note: 'Runs the bakery. Says the rye "hasn\'t been right since spring."' },
+      { line: 'It\'s my mother\'s recipe. Rosa\'s rye. She baked it in that oven for forty years, and she died in April. I make it every morning, and every morning it comes out wrong.',
+        again: 'I keep thinking about Mum\'s hands on the dough. Sorry. You didn\'t come in for that.',
+        note: 'Her mother, Rosa, died in April. Marisol bakes Rosa\'s rye every morning, and it never comes out right.' },
+      { line: 'Everyone tells me she\'s in a better place. Or that ninety-one is a good long life. I know they mean well. I just nod and go back to the dough.',
+        again: 'Mrs. Pell came by this morning and told me Mum\'s "at peace now." I nodded. I always nod.',
+        note: 'People keep telling her Rosa is "in a better place." She just nods.' },
+      { line: 'I was at the market in Fernhill the day she went. She asked me to stay home. I told her I\'d be back by two. I wasn\'t back by two.',
+        again: 'I keep doing the sums. If I\'d left Fernhill at noon. If I\'d skipped the flour merchant.',
+        note: 'She wasn\'t there when Rosa died. Rosa had asked her to stay home that day.' },
+      { line: 'And I haven\'t cried. Not once since April. I think if I start I won\'t stop. So I get up at four, and I knead.',
+        again: 'Up at four again this morning. Knead, fold, knead. It keeps my hands busy.',
+        note: 'She hasn\'t cried since April. She\'s afraid that if she starts, she won\'t stop.' },
+      { line: '...There. Look at me, flour and tears everywhere. Thank you for not trying to fix it. Here, take a loaf. It\'s still wrong. But it\'s hers, and I\'d like you to have it.',
+        note: 'Marisol finally let herself cry. She gave you a loaf of Rosa\'s rye.' },
+    ],
+    guarded: ['Mm. Well. Bread won\'t bake itself.', 'Right. Can I get you anything, love? A bun?', 'That\'s kind. I should check the oven.'],
+    hurt: 'I think I\'d best get back to the ovens. Mind the door on your way out.',
+    after: ['Morning, love. The rye\'s a little better. Or I\'m a little better. Hard to say.', 'I went up to Mum\'s garden yesterday and sat there a whole hour. Thank you.'],
+  },
+  theo: {
+    name: 'Theo', place: 'End of the dock', voice: 210,
+    hint: 'Someone is always fishing off the dock by the pond.',
+    bio: '24, a fisherman who lives with his dad, a lifelong Thistlewick fisherman. Gentle, funny, guarded.',
+    style: 'Short sentences. Dry jokes when he\'s nervous. Trails off with "anyway".',
+    keepsake: 'Theo\'s lucky lure',
+    look: { skin:'#c58c64', hair:'#2d2420', shirt:'#f2c230', pants:'#34496a', shoe:'#2b2a33', hat:'#3f8a8f', style:'beanie', bg:'#1f3340' },
+    beats: [
+      { line: 'Oh. Hey. Didn\'t hear you. Just watching the bobber. Fish aren\'t biting today. Nothing is, really.',
+        again: 'Hey. Still nothing biting. Pull up a plank, if you want.',
+        note: 'Fishes off the dock. Seems far away. "Nothing is biting, really."' },
+      { line: 'Sorry. My head\'s across the water. There\'s someone in Larkspur I\'ve been seeing. It\'s good. It\'s really, really good, actually. That\'s the problem.',
+        again: 'I was over in Larkspur again last night. Told Dad I was buying net twine.',
+        note: 'He\'s seeing someone in Larkspur. It\'s "really good," and somehow that\'s the problem.' },
+      { line: 'His name\'s Ellis. Nobody here knows about him. Not my friends, not my dad. Dad thinks I keep crossing the water for boat parts.',
+        again: 'Ellis sent me a drawing of a heron. It\'s been in my pocket all day. Couldn\'t show anyone.',
+        note: 'The someone is Ellis. Nobody in the village knows Theo is with a man, not even his dad.' },
+      { line: 'At the Tide Supper last week, somebody made a joke about two men from Larkspur. Dad laughed. And I laughed too. I\'ve felt sick about it all week.',
+        again: 'Dad asked me to help with the nets on Sunday. Like nothing\'s wrong. For him, nothing is.',
+        note: 'His dad laughed at a joke about two men. Theo laughed along and has felt sick ever since.' },
+      { line: 'Ellis asked me to his sister\'s wedding. As his partner, in front of everyone. I want to say yes so badly. But if I go, I might lose Dad. And if I don\'t, I lose a piece of me. ...What would you do?',
+        again: 'The wedding\'s in three weeks. I\'ve typed "yes" to Ellis four times and deleted it four times.',
+        note: 'Ellis invited him to a wedding as his partner. Theo feels caught between Ellis and his dad.' },
+      { line: 'You didn\'t tell me what to do. You just let me say it out loud. ...I\'m saying yes to Ellis. And I\'ll tell Dad. Not today, but soon, on my own terms. Here. My lucky lure. I don\'t think I need the luck right now.',
+        note: 'Theo is saying yes to Ellis, and plans to tell his dad soon. He gave you his lucky lure.' },
+    ],
+    guarded: ['Yeah. Anyway. Hope the weather holds.', 'Ha. Sure. It\'s nothing, really.', 'Mm. I should probably reel in.'],
+    hurt: '...Right. I\'m gonna head in. See you around.',
+    after: ['Ellis says hi. Well, he says hi to "the one who listened." That\'s you.', 'Fish are biting again. Funny how that works.'],
+  },
+  june: {
+    name: 'June', place: 'Her garden, east side', voice: 520,
+    hint: 'Someone keeps bees behind the yellow cottage.',
+    bio: '71, keeps bees and the biggest garden in Thistlewick. Effusive, chatty, laughs easily.',
+    style: 'Bubbly and warm, lots of exclamation marks, calls people "dear", talks to and about her bees.',
+    keepsake: 'A jar of June\'s honey',
+    look: { skin:'#f0cfb5', hair:'#efece4', shirt:'#6fa35a', skirt:'#5b8f4a', legs:'#f0cfb5', shoe:'#7a4a30', straw:'#e8c36a', ribbon:'#e26d8e', style:'straw', blush:true, bg:'#2a3a22' },
+    beats: [
+      { line: 'Hello, hello! Mind the bees, they\'re in a mood. Isn\'t it a glorious morning? I could kiss every marigold in this bed!',
+        again: 'Hello again, dear! I\'ve been grinning at the tomatoes all morning. They think I\'ve lost it.',
+        note: 'Keeps bees and a big garden. Unusually, gloriously happy today.' },
+      { line: 'Oh, you\'ll think I\'m silly. I got a letter yesterday, and I\'ve read it forty times. Forty! It\'s from my daughter. From Cora.',
+        again: 'I read Cora\'s letter again at breakfast. Forty-one times now. I\'m keeping count!',
+        note: 'She got a letter from her daughter, Cora, and has read it forty times.' },
+      { line: 'We haven\'t spoken in nine years. I said terrible things at her wedding, things I can\'t take back. And she still wrote to me. She started it "Dear Mum."',
+        again: '"Dear Mum." Nine years, and she still started with "Dear."',
+        note: 'June and Cora haven\'t spoken in nine years, since June said hurtful things at Cora\'s wedding.' },
+      { line: 'And there\'s more! Cora has a little girl. Pip. She\'s six, and she draws bees! I\'m a grandmother. I\'ve been a grandmother for six whole years and I never knew!',
+        again: 'Pip draws bees. Did I tell you that? Of course I told you. I\'ll tell you again!',
+        note: 'Cora has a six-year-old daughter, Pip, who draws bees. June is a grandmother.' },
+      { line: 'They\'re coming on Saturday, on the noon ferry. I\'m so happy I can hardly breathe. And I\'m terrified I\'ll open my mouth and ruin it all again.',
+        again: 'Saturday, noon ferry. I\'ve cleaned the house twice. The bees are judging me.',
+        note: 'Cora and Pip arrive Saturday. June is overjoyed, and scared she\'ll ruin it.' },
+      { line: 'You know, everyone I\'ve told says "Well, be careful, June." You\'re the first person who just let me be happy. Take a jar of this year\'s honey. I\'m going to make Pip a tiny beekeeper\'s hat!',
+        note: 'June let herself be happy. She gave you a jar of honey and is making Pip a beekeeper\'s hat.' },
+    ],
+    guarded: ['Ha! Well, never mind me. How are you settling in, dear?', 'Oh, it\'s nothing. Have you seen the bees? Look at them go!', 'Mm, yes. Anyway! Lovely weather.'],
+    hurt: 'Oh. Well. I\'d best see to the hives. Good day, dear.',
+    after: ['Pip\'s hat fits! Well, it\'s enormous. She loves it.', 'Cora and I walked the whole garden yesterday. Slowly. It was perfect.'],
+  },
+};
+const ORDER = ['marisol', 'theo', 'june'];
+
+const SKILLS = {
+  reflect: 'Reflected back', feeling: 'Named a feeling', open_q: 'Open question',
+  validate: 'Validated', present: 'Stayed with them', share: 'Shared gently', opinion: 'Kind, honest opinion',
+};
+
+const TRUST_TIPS = [
+  'Trust is new. Keep the focus on them, and hold back your own stories and advice for now.',
+  'Trust is new. Keep the focus on them, and hold back your own stories and advice for now.',
+  'They\'re warming up. You can share a little of yourself, briefly, then turn it back to them.',
+  'They\'re warming up. You can share a little of yourself, briefly, then turn it back to them.',
+  'They trust you. You can offer an honest, kind opinion, once you\'ve shown you understand how they feel.',
+  'Their story is complete. Thank you for listening.',
+];
+
+const MOVES_HTML = `
+  <div class="moves">
+    <div class="move"><b>Reflect it back</b>Say what you heard, in your own words. <i>"So the bread hasn't felt right since your mum died."</i></div>
+    <div class="move"><b>Name the feeling</b>Gently guess at what they feel. <i>"That sounds lonely."</i></div>
+    <div class="move"><b>Ask an open question</b>Ask something that can't be answered yes or no. <i>"What was she like?"</i></div>
+    <div class="move"><b>Stay with them</b>Don't rush to fix it, cheer them up, or change the subject.</div>
+  </div>`;
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+const TILE = 16, SPEED = 66;
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function hash(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  const f = amt < 0 ? 0 : 255, p = Math.abs(amt);
+  r = Math.round(r + (f - r) * p); g = Math.round(g + (f - g) * p); b = Math.round(b + (f - b) * p);
+  return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+}
+function blob(g, cx, cy, r, col) {
+  g.fillStyle = col;
+  for (let dy = -r; dy <= r; dy++) { const w = Math.floor(Math.sqrt(Math.max(0, r * r - dy * dy + r * 0.5))); g.fillRect(cx - w, cy + dy, w * 2 + 1, 1); }
+}
+const HEART = '<svg viewBox="0 0 7 6" width="14" height="12" shape-rendering="crispEdges" aria-hidden="true"><path d="M1 0h2v1h1V0h2v1h1v2H6v1H5v1H4v1H3V5H2V4H1V3H0V1h1z" fill="currentColor"/></svg>';
+function heartsHTML(n, popIndex = -1) {
+  let s = '';
+  for (let i = 0; i < 5; i++) s += `<span class="${i < n ? 'on' : ''}${i === popIndex ? ' pop' : ''}">${HEART}</span>`;
+  return s;
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+/* ============================================================
+   Save state
+   ============================================================ */
+const SAVE_KEY = 'listening-thistlewick-v1';
+function freshState() {
+  const v = {};
+  for (const id of ORDER) v[id] = { stage: 0, met: false, turns: [], coach: '', g: 0, a: 0 };
+  return { map: 'village', x: 13 * TILE + 8, y: 8 * TILE + 12, dir: 'down', name: '', coach: true, sound: true,
+    replies: 0, passed: 0, skills: {}, keepsakes: [], v, started: false };
+}
+let state = freshState();
+function loadSaved() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    const base = freshState();
+    return { ...base, ...s, v: Object.fromEntries(ORDER.map(id => [id, { ...base.v[id], ...(s.v && s.v[id]) }])) };
+  } catch { return null; }
+}
+function save() {
+  state.map = cur.id; state.x = player.x; state.y = player.y; state.dir = player.dir;
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {}
+}
+
+/* ============================================================
+   Maps
+   ============================================================ */
+const P = {
+  grass: '#79bc5c', grassDark: '#5c9c46', grassLight: '#a2d973',
+  path: '#dfc189', pathEdge: '#c9a670', pathDot: '#b8925c',
+  cobble: '#c3bba9', cobble2: '#a9a18f', cobbleLine: '#8f8777',
+  water: '#4f9fd5', water2: '#4390c8', waterHi: '#b0e0f8',
+  sand: '#e6d39b', sand2: '#d4be82',
+  dock: '#b07b4c', dockLine: '#7a5233',
+  soil: '#7c5536', soil2: '#694529',
+  shadow: 'rgba(25,40,25,.24)',
+};
+const FLOWERS = ['#fff6e0', '#f7a8c4', '#ffd35c', '#b9a3f0', '#ff9a7a'];
+
+function makeMap(id, W, H, opts = {}) {
+  const g = [...Array(H)].map(() => Array(W).fill(opts.fill || '.'));
+  return { id, W, H, g, objs: [], inter: [], solid: null, label: opts.label || '', bg: opts.bg || '#1d2a21', ...opts };
+}
+function fill(m, x0, y0, x1, y1, c) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) m.g[y][x] = c; }
+
+function buildVillage() {
+  const m = makeMap('village', 36, 26, { label: 'Thistlewick' });
+  fill(m, 1, 12, 34, 13, '=');
+  fill(m, 17, 1, 18, 24, '=');
+  fill(m, 14, 10, 21, 15, 'c');
+  fill(m, 7, 7, 7, 11, '=');
+  fill(m, 13, 7, 13, 11, '=');
+  fill(m, 26, 7, 26, 11, '=');
+  fill(m, 28, 8, 32, 10, 'g');
+  fill(m, 11, 14, 11, 19, '=');
+  fill(m, 6, 19, 11, 19, '=');
+  fill(m, 22, 15, 26, 15, '=');
+  for (let y = 0; y < m.H; y++) for (let x = 0; x < m.W; x++) {
+    const dx = (x + .5 - 28.5) / 6.3, dy = (y + .5 - 20.6) / 3.9, d = dx * dx + dy * dy;
+    if (d < 1) m.g[y][x] = '~'; else if (d < 1.4 && m.g[y][x] === '.') m.g[y][x] = 's';
+  }
+  fill(m, 26, 16, 26, 21, '-');
+
+  const O = m.objs;
+  O.push({ kind: 'house', x: 4, y: 2, w: 7, h: 5, door: { x: 7, y: 6 }, roof: '#c4533f', wall: '#f0d7a8', trim: '#8a4b2c', chimney: true, sign: 'bread', enter: 'bakery', label: 'Bakery' });
+  O.push({ kind: 'house', x: 12, y: 3, w: 4, h: 4, door: { x: 13, y: 6 }, roof: '#4f7fb3', wall: '#e9e1cf', trim: '#5a4a3a', mailbox: true, enter: 'home', label: 'Your home' });
+  O.push({ kind: 'house', x: 24, y: 2, w: 6, h: 5, door: { x: 26, y: 6 }, roof: '#e0a035', wall: '#f6edd8', trim: '#8a6a3a', chimney: true,
+    locked: ['June\'s cottage. The door is propped open with a flowerpot.', 'You can hear humming from the garden next door.'] });
+  O.push({ kind: 'house', x: 3, y: 15, w: 6, h: 4, door: { x: 6, y: 18 }, roof: '#7a6aa8', wall: '#ddd0b5', trim: '#4f4060',
+    locked: ['A note is pinned to the door:', '"Gone to the coast for a few days. Back soon. —A."'] });
+
+  const trees = [];
+  for (let x = 0; x < 36; x++) { trees.push([x, 0], [x, 25]); }
+  for (let y = 1; y < 25; y++) { trees.push([0, y], [35, y]); }
+  trees.push([2, 9], [3, 22], [8, 23], [13, 22], [14, 18], [20, 21], [21, 3], [22, 8], [33, 4], [34, 15], [2, 4], [9, 10], [10, 22], [1, 16], [31, 14], [5, 11]);
+  for (const [x, y] of trees) O.push({ kind: 'tree', x, y, solid: true });
+
+  const fences = [];
+  for (let x = 27; x <= 34; x++) fences.push([x, 7]);
+  for (let x = 28; x <= 34; x++) fences.push([x, 11]);
+  for (const y of [8, 10, 11]) fences.push([27, y]);
+  for (const y of [8, 9, 10]) fences.push([34, y]);
+  const fset = new Set(fences.map(([x, y]) => x + ',' + y));
+  for (const [x, y] of fences) O.push({ kind: 'fence', x, y, solid: true, horiz: fset.has((x - 1) + ',' + y) || fset.has((x + 1) + ',' + y) });
+
+  O.push({ kind: 'hive', x: 33, y: 8, solid: true }, { kind: 'hive', x: 33, y: 10, solid: true });
+  O.push({ kind: 'well', x: 15, y: 10, w: 2, h: 2, solid: true });
+  O.push({ kind: 'board', x: 20, y: 10, solid: true });
+  O.push({ kind: 'lamp', x: 14, y: 10, solid: true }, { kind: 'lamp', x: 21, y: 14, solid: true });
+  O.push({ kind: 'bench', x: 19, y: 14, solid: true });
+
+  m.inter.push(
+    { x: 20, y: 10, label: 'Read', pages: [
+      'WELCOME TO THISTLEWICK. Population 41, plus a great many bees.',
+      'Folk here are friendly. But everyone is carrying something, and they only share it with someone who really listens.',
+      'When someone talks to you, type your reply. Show them you heard: say back what they told you, name what they might be feeling, or ask a gentle question.',
+      'Try not to fix things, cheer them up, or change the subject. As they come to trust you, you can share more of yourself.',
+      'Your journal (J) keeps track of what you learn. Welcome home! —The Village Council',
+    ] },
+    { x: 15, y: 10, w: 2, h: 2, label: 'Look', pages: ['You peer into the well. A coin glints at the bottom. Someone made a wish.'] },
+    { x: 33, y: 8, label: 'Look', pages: ['The hive hums, busy and content.'] },
+    { x: 33, y: 10, label: 'Look', pages: ['A bee lands on your sleeve, thinks about it, and leaves.'] },
+    { x: 19, y: 14, label: 'Sit', pages: ['You sit for a moment. The village sounds drift by: a door, a gull, someone laughing.'] },
+  );
+  return m;
+}
+
+function buildInterior(id, opts) {
+  const m = makeMap(id, 11, 8, { fill: 'F', bg: '#120e14', ...opts });
+  fill(m, 0, 0, 10, 1, 'w');
+  m.g[7][5] = 'E';
+  return m;
+}
+function buildBakery() {
+  const m = buildInterior('bakery', { label: 'Bakery', wall: '#e8c9a0', wallStripe: '#dcb88b', floor: '#b98a5a', floorLine: '#9c7046', spawn: { x: 5, y: 6 } });
+  m.objs.push(
+    { kind: 'window', x: 5, y: 0 },
+    { kind: 'shelf', x: 1, y: 1, w: 3, h: 1 },
+    { kind: 'oven', x: 7, y: 1, w: 2, h: 1 },
+    { kind: 'counter', x: 2, y: 4, w: 5, h: 1, solid: true },
+    { kind: 'table', x: 8, y: 5, solid: true },
+    { kind: 'sacks', x: 1, y: 6, solid: true },
+  );
+  m.inter.push(
+    { x: 1, y: 1, w: 3, h: 1, label: 'Look', pages: ['Loaves of every shape. The rye loaves are a little lopsided.'] },
+    { x: 7, y: 1, w: 2, h: 1, label: 'Look', pages: ['The oven is warm. It looks older than you are.'] },
+    { x: 1, y: 6, label: 'Look', pages: ['Sacks of flour from the Fernhill mill.'] },
+  );
+  return m;
+}
+function buildHome() {
+  const m = buildInterior('home', { label: 'Your home', wall: '#c8d5e2', wallStripe: '#b7c6d5', floor: '#a8794d', floorLine: '#8c623c', spawn: { x: 5, y: 6 } });
+  m.objs.push(
+    { kind: 'window', x: 3, y: 0 }, { kind: 'window', x: 7, y: 0 },
+    { kind: 'bed', x: 1, y: 2, w: 1, h: 2, solid: true },
+    { kind: 'desk', x: 4, y: 3, w: 2, h: 1, solid: true },
+    { kind: 'boxes', x: 8, y: 5, w: 2, h: 2, solid: true },
+    { kind: 'plant', x: 9, y: 2, solid: true },
+  );
+  m.inter.push(
+    { x: 4, y: 3, w: 2, h: 1, label: 'Open journal', action: 'journal' },
+    { x: 1, y: 2, w: 1, h: 2, label: 'Look', pages: ['Your bed. Still unmade from the move.'] },
+    { x: 8, y: 5, w: 2, h: 2, label: 'Look', pages: ['Moving boxes. One is labelled "MISC (IMPORTANT?)".'] },
+    { x: 9, y: 2, label: 'Look', pages: ['A little fern. You promise to water it more.'] },
+  );
+  return m;
+}
+
+function finishMap(m) {
+  m.solid = [...Array(m.H)].map((_, y) => [...Array(m.W)].map((_, x) => (m.g[y][x] === '~' || m.g[y][x] === 'w') ? 1 : 0));
+  for (const o of m.objs) {
+    const w = o.w || 1, h = o.h || 1;
+    if (o.kind === 'house') {
+      for (let y = o.y; y < o.y + h; y++) for (let x = o.x; x < o.x + w; x++) m.solid[y][x] = 1;
+      m.solid[o.door.y][o.door.x] = { door: o };
+    } else if (o.solid) {
+      for (let y = o.y; y < o.y + h; y++) for (let x = o.x; x < o.x + w; x++) m.solid[y][x] = 1;
+    }
+    o.sortY = sortYFor(o);
+  }
+  m.ground = renderGround(m);
+  return m;
+}
+function sortYFor(o) {
+  const h = o.h || 1;
+  switch (o.kind) {
+    case 'window': case 'shelf': case 'oven': return 2 * TILE - 1;
+    case 'house': return (o.y + h) * TILE - 1;
+    default: return (o.y + h) * TILE - 2;
+  }
+}
+
+/* ============================================================
+   Ground rendering (pre-rendered once per map)
+   ============================================================ */
+function renderGround(m) {
+  const c = document.createElement('canvas'); c.width = m.W * TILE; c.height = m.H * TILE;
+  const g = c.getContext('2d');
+  for (let y = 0; y < m.H; y++) for (let x = 0; x < m.W; x++) drawTile(g, m, x, y);
+  return c;
+}
+function isPathy(t) { return t === '=' || t === 'c' || t === '-'; }
+function tileAt(m, x, y) { return (x < 0 || y < 0 || x >= m.W || y >= m.H) ? '#' : m.g[y][x]; }
+function drawGrass(g, x, y, X, Y, flowers) {
+  g.fillStyle = P.grass; g.fillRect(X, Y, TILE, TILE);
+  for (let i = 0; i < 3; i++) {
+    const px = X + 1 + Math.floor(hash(x * 7 + i, y * 13) * 13), py = Y + 1 + Math.floor(hash(x + i * 31, y * 3 + 7) * 12);
+    g.fillStyle = P.grassDark; g.fillRect(px, py + 1, 1, 2); g.fillRect(px + 2, py, 1, 3);
+    g.fillStyle = P.grassLight; g.fillRect(px + 1, py + 2, 1, 1);
+  }
+  const r = hash(x * 3 + 1, y * 5 + 2);
+  if (flowers || r < 0.09) {
+    const n = 1 + Math.floor(hash(x, y * 9) * 3);
+    for (let i = 0; i < n; i++) {
+      const fx = X + 2 + Math.floor(hash(x + i * 17, y) * 11), fy = Y + 2 + Math.floor(hash(x, y + i * 23) * 11);
+      g.fillStyle = FLOWERS[Math.floor(hash(x + i, y + i * 5) * FLOWERS.length)];
+      g.fillRect(fx - 1, fy, 3, 1); g.fillRect(fx, fy - 1, 1, 3);
+      g.fillStyle = '#ffe9a0'; g.fillRect(fx, fy, 1, 1);
+    }
+  } else if (r > 0.975) {
+    g.fillStyle = '#a19f97'; g.fillRect(X + 6, Y + 9, 5, 3); g.fillStyle = '#c9c6bc'; g.fillRect(X + 7, Y + 9, 3, 1);
+  }
+}
+function drawWater(g, x, y, X, Y) {
+  g.fillStyle = P.water; g.fillRect(X, Y, TILE, TILE);
+  g.fillStyle = P.water2;
+  const o = Math.floor(hash(x, y) * 8);
+  g.fillRect(X + o, Y + 4, 5, 1); g.fillRect(X + ((o + 7) % 12), Y + 11, 4, 1);
+}
+function drawTile(g, m, x, y) {
+  const t = m.g[y][x], X = x * TILE, Y = y * TILE;
+  switch (t) {
+    case '.': case ':': drawGrass(g, x, y, X, Y, t === ':'); break;
+    case '=': {
+      g.fillStyle = P.path; g.fillRect(X, Y, TILE, TILE);
+      for (let i = 0; i < 3; i++) { g.fillStyle = P.pathDot; g.fillRect(X + 1 + Math.floor(hash(x * 5 + i, y) * 13), Y + 1 + Math.floor(hash(x, y * 7 + i) * 13), 2, 1); }
+      g.fillStyle = P.pathEdge;
+      if (!isPathy(tileAt(m, x, y - 1))) g.fillRect(X, Y, TILE, 1);
+      if (!isPathy(tileAt(m, x, y + 1))) g.fillRect(X, Y + 15, TILE, 1);
+      if (!isPathy(tileAt(m, x - 1, y))) g.fillRect(X, Y, 1, TILE);
+      if (!isPathy(tileAt(m, x + 1, y))) g.fillRect(X + 15, Y, 1, TILE);
+      break;
+    }
+    case 'c': {
+      g.fillStyle = P.cobbleLine; g.fillRect(X, Y, TILE, TILE);
+      const off = (y % 2) * 4;
+      for (let r = 0; r < 2; r++) for (let k = -1; k < 2; k++) {
+        const sx = X + k * 8 + off + (r ? 4 : 0), sy = Y + r * 8;
+        const x0 = Math.max(X, sx), x1 = Math.min(X + 16, sx + 7);
+        if (x1 <= x0) continue;
+        g.fillStyle = hash(x * 3 + k, y * 2 + r) > .5 ? P.cobble : P.cobble2; g.fillRect(x0, sy, x1 - x0, 7);
+        g.fillStyle = '#d6cfbf'; g.fillRect(x0, sy, Math.min(3, x1 - x0), 1);
+      }
+      break;
+    }
+    case '~': drawWater(g, x, y, X, Y); break;
+    case 's': {
+      g.fillStyle = P.sand; g.fillRect(X, Y, TILE, TILE);
+      g.fillStyle = P.sand2;
+      for (let i = 0; i < 4; i++) g.fillRect(X + Math.floor(hash(x + i, y * 3) * 15), Y + Math.floor(hash(x * 2, y + i) * 15), 1, 1);
+      break;
+    }
+    case '-': {
+      drawWater(g, x, y, X, Y);
+      g.fillStyle = P.dockLine; g.fillRect(X + 1, Y, 14, 16);
+      for (let i = 0; i < 4; i++) { g.fillStyle = P.dock; g.fillRect(X + 2, Y + i * 4, 12, 3); g.fillStyle = '#c99566'; g.fillRect(X + 2, Y + i * 4, 12, 1); }
+      g.fillStyle = '#5c3d26'; g.fillRect(X, Y + 12, 2, 4); g.fillRect(X + 14, Y + 12, 2, 4);
+      break;
+    }
+    case 'g': {
+      g.fillStyle = P.soil; g.fillRect(X, Y, TILE, TILE);
+      g.fillStyle = P.soil2; g.fillRect(X, Y + 5, TILE, 1); g.fillRect(X, Y + 12, TILE, 1);
+      const cols = ['#f4a340', '#f37ca0', '#fff1d6', '#ffd35c'];
+      for (const [px, py] of [[4, 3], [11, 4], [7, 10], [13, 11], [2, 12]]) {
+        g.fillStyle = '#4f8f3a'; g.fillRect(X + px, Y + py + 1, 1, 3);
+        g.fillStyle = cols[Math.floor(hash(x * 3 + px, y + py) * cols.length)];
+        g.fillRect(X + px - 1, Y + py - 1, 3, 2); g.fillRect(X + px, Y + py - 2, 1, 1);
+      }
+      break;
+    }
+    case 'F': case 'E': {
+      g.fillStyle = m.floor; g.fillRect(X, Y, TILE, TILE);
+      g.fillStyle = m.floorLine;
+      for (let i = 0; i < 4; i++) { g.fillRect(X, Y + i * 4 + 3, TILE, 1); g.fillRect(X + ((x * 5 + i * 7) % 16), Y + i * 4, 1, 3); }
+      if (t === 'E') { g.fillStyle = '#9e3c3c'; g.fillRect(X + 1, Y + 4, 14, 10); g.fillStyle = '#c45a4a'; g.fillRect(X + 2, Y + 6, 12, 1); g.fillRect(X + 2, Y + 11, 12, 1); }
+      break;
+    }
+    case 'w': {
+      g.fillStyle = m.wall; g.fillRect(X, Y, TILE, TILE);
+      g.fillStyle = m.wallStripe; for (let i = 0; i < 16; i += 4) g.fillRect(X + i, Y, 2, TILE);
+      if (y === 0) { g.fillStyle = '#6b4a30'; g.fillRect(X, Y, TILE, 3); }
+      if (y === 1) { g.fillStyle = '#7a5233'; g.fillRect(X, Y + 12, TILE, 4); g.fillStyle = '#9c7046'; g.fillRect(X, Y + 12, TILE, 1); }
+      break;
+    }
+  }
+}
+
+/* ============================================================
+   Object drawing
+   ============================================================ */
+let T = 0; // seconds since start, for animation
+
+function drawObj(g, o) {
+  const X = o.x * TILE, Y = o.y * TILE;
+  switch (o.kind) {
+    case 'tree': {
+      const v = hash(o.x, o.y);
+      g.fillStyle = P.shadow; g.fillRect(X, Y + 12, 16, 4);
+      g.fillStyle = '#6b4226'; g.fillRect(X + 6, Y + 3, 4, 12); g.fillStyle = '#8a5a34'; g.fillRect(X + 6, Y + 3, 1, 12);
+      const cx = X + 8, cy = Y - 4;
+      const pal = v < 0.1 ? ['#a8582c', '#cf7a35', '#eda54c'] : v < 0.55 ? ['#2f6b34', '#428a3d', '#5ea84a'] : ['#34713a', '#4b9443', '#6db352'];
+      blob(g, cx, cy, 10, pal[0]); blob(g, cx - 2, cy - 2, 8, pal[1]); blob(g, cx - 3, cy - 4, 4, pal[2]);
+      if (v > 0.8) { g.fillStyle = '#f7b3cb'; for (const [a, b] of [[-6, -2], [3, -7], [5, 2], [-2, 4], [6, -3]]) g.fillRect(cx + a, cy + b, 2, 2); }
+      else if (v > 0.68 && v < 0.74) { g.fillStyle = '#e04b3d'; for (const [a, b] of [[-5, 0], [4, -5], [2, 3]]) g.fillRect(cx + a, cy + b, 2, 2); }
+      break;
+    }
+    case 'house': drawHouse(g, o); break;
+    case 'fence': {
+      const c = '#d8ae74', d = '#9c7343';
+      if (o.horiz) {
+        g.fillStyle = d; g.fillRect(X, Y + 7, 16, 2); g.fillRect(X, Y + 12, 16, 1);
+        g.fillStyle = c; g.fillRect(X, Y + 6, 16, 2); g.fillRect(X, Y + 11, 16, 1);
+        g.fillStyle = d; g.fillRect(X + 6, Y + 3, 4, 12); g.fillStyle = c; g.fillRect(X + 6, Y + 3, 3, 11);
+      } else {
+        g.fillStyle = d; g.fillRect(X + 8, Y - 2, 2, 18); g.fillStyle = c; g.fillRect(X + 7, Y - 2, 2, 18);
+        g.fillStyle = d; g.fillRect(X + 6, Y + 3, 4, 12); g.fillStyle = c; g.fillRect(X + 6, Y + 3, 3, 11);
+      }
+      break;
+    }
+    case 'hive': {
+      g.fillStyle = P.shadow; g.fillRect(X + 2, Y + 13, 13, 3);
+      g.fillStyle = '#d9a441'; g.fillRect(X + 3, Y + 4, 10, 11);
+      g.fillStyle = '#b98a2e'; g.fillRect(X + 3, Y + 8, 10, 1); g.fillRect(X + 3, Y + 12, 10, 1);
+      g.fillStyle = '#a06f45'; g.fillRect(X + 2, Y + 2, 12, 3); g.fillStyle = '#c08a5a'; g.fillRect(X + 2, Y + 2, 12, 1);
+      g.fillStyle = '#2b2030'; g.fillRect(X + 7, Y + 13, 3, 1);
+      for (let i = 0; i < 3; i++) {
+        const a = T * (2.2 + i * .4) + i * 2.1, bx = Math.round(X + 8 + Math.cos(a) * (7 + i)), by = Math.round(Y + 2 + Math.sin(a * 1.3) * 5);
+        g.fillStyle = '#ffd93d'; g.fillRect(bx, by, 2, 1); g.fillStyle = '#2b2030'; g.fillRect(bx + 1, by, 1, 1);
+      }
+      break;
+    }
+    case 'well': {
+      g.fillStyle = P.shadow; g.fillRect(X + 3, Y + 27, 28, 4);
+      g.fillStyle = '#7f7a70'; g.fillRect(X + 4, Y + 15, 24, 14);
+      g.fillStyle = '#a6a196'; for (let r = 0; r < 3; r++) for (let k = 0; k < 4; k++) g.fillRect(X + 5 + k * 6 + (r % 2) * 3, Y + 17 + r * 4, 5, 3);
+      g.fillStyle = '#2d5f86'; g.fillRect(X + 7, Y + 14, 18, 4); g.fillStyle = '#5a8fb8'; g.fillRect(X + 9, Y + 15, 4, 1);
+      g.fillStyle = '#6b4226'; g.fillRect(X + 5, Y + 2, 2, 14); g.fillRect(X + 25, Y + 2, 2, 14);
+      g.fillStyle = '#b5523f'; g.fillRect(X + 2, Y - 1, 28, 5); g.fillStyle = '#d0684f'; g.fillRect(X + 2, Y - 1, 28, 1);
+      g.fillStyle = '#8f3e30'; g.fillRect(X + 2, Y + 3, 28, 1);
+      g.fillStyle = '#c9b48d'; g.fillRect(X + 15, Y + 4, 1, 6); g.fillStyle = '#8a5a34'; g.fillRect(X + 13, Y + 9, 5, 4);
+      break;
+    }
+    case 'board': {
+      g.fillStyle = P.shadow; g.fillRect(X + 1, Y + 13, 14, 3);
+      g.fillStyle = '#6b4226'; g.fillRect(X + 2, Y + 8, 2, 7); g.fillRect(X + 12, Y + 8, 2, 7);
+      g.fillStyle = '#5c3a22'; g.fillRect(X, Y - 2, 16, 12); g.fillStyle = '#9c6b3e'; g.fillRect(X + 1, Y - 1, 14, 10);
+      g.fillStyle = '#f4efe0'; g.fillRect(X + 2, Y, 5, 5); g.fillRect(X + 9, Y + 1, 5, 4);
+      g.fillStyle = '#ffd3e0'; g.fillRect(X + 4, Y + 5, 6, 3);
+      g.fillStyle = '#c4533f'; g.fillRect(X + 4, Y, 1, 1); g.fillRect(X + 11, Y + 1, 1, 1);
+      if (Math.floor(T * 2) % 2 === 0 && !state.boardRead) { g.fillStyle = '#ffcc4d'; g.fillRect(X + 7, Y - 8, 2, 4); g.fillRect(X + 7, Y - 3, 2, 1); }
+      break;
+    }
+    case 'lamp': {
+      g.fillStyle = P.shadow; g.fillRect(X + 4, Y + 13, 8, 3);
+      g.fillStyle = '#3b3946'; g.fillRect(X + 7, Y - 4, 2, 18); g.fillRect(X + 5, Y + 12, 6, 2);
+      g.fillStyle = '#2c2a36'; g.fillRect(X + 5, Y - 9, 6, 6);
+      g.fillStyle = '#ffe08a'; g.fillRect(X + 6, Y - 8, 4, 4);
+      g.fillStyle = 'rgba(255,224,138,.16)'; g.fillRect(X + 2, Y - 12, 12, 12);
+      break;
+    }
+    case 'bench': {
+      g.fillStyle = P.shadow; g.fillRect(X + 1, Y + 12, 15, 3);
+      g.fillStyle = '#7a5233'; g.fillRect(X + 2, Y + 9, 2, 5); g.fillRect(X + 12, Y + 9, 2, 5);
+      g.fillStyle = '#a8754a'; g.fillRect(X + 1, Y + 3, 14, 3); g.fillRect(X + 1, Y + 7, 14, 3);
+      g.fillStyle = '#c99566'; g.fillRect(X + 1, Y + 7, 14, 1);
+      break;
+    }
+    case 'window': {
+      g.fillStyle = '#f4efe0'; g.fillRect(X + 1, Y + 4, 14, 12);
+      g.fillStyle = '#a8d8f0'; g.fillRect(X + 2, Y + 5, 12, 10);
+      g.fillStyle = '#d5eefa'; g.fillRect(X + 3, Y + 6, 3, 2);
+      g.fillStyle = '#f4efe0'; g.fillRect(X + 7, Y + 5, 2, 10); g.fillRect(X + 2, Y + 9, 12, 1);
+      g.fillStyle = '#d76a6a'; g.fillRect(X, Y + 3, 3, 14); g.fillRect(X + 13, Y + 3, 3, 14);
+      break;
+    }
+    case 'shelf': {
+      const w = o.w * TILE;
+      for (const sy of [Y - 6, Y + 4]) {
+        g.fillStyle = '#7a5233'; g.fillRect(X, sy + 6, w, 3);
+        for (let i = 0; i < w - 4; i += 8) {
+          const rye = hash(o.x + i, sy) > .5;
+          g.fillStyle = rye ? '#7f4f2a' : '#c9873f'; g.fillRect(X + 2 + i, sy + 1, 6, 5);
+          g.fillStyle = rye ? '#9c6536' : '#e0a75a'; g.fillRect(X + 3 + i, sy + 1, 4, 1);
+        }
+      }
+      break;
+    }
+    case 'oven': {
+      const w = o.w * TILE;
+      g.fillStyle = '#8a4232'; g.fillRect(X, Y - 14, w, 30);
+      g.fillStyle = '#a5523f'; for (let r = 0; r < 7; r++) for (let k = 0; k < 4; k++) g.fillRect(X + 1 + k * 8 + (r % 2) * 4, Y - 13 + r * 4, 6, 3);
+      g.fillStyle = '#2a1612'; g.fillRect(X + 7, Y + 1, 18, 11);
+      g.fillStyle = Math.floor(T * 6) % 2 ? '#ff9a3c' : '#ffb85c'; g.fillRect(X + 9, Y + 7, 14, 4);
+      g.fillStyle = '#ffd98a'; g.fillRect(X + 12, Y + 9, 7, 2);
+      break;
+    }
+    case 'counter': {
+      const w = o.w * TILE;
+      g.fillStyle = P.shadow; g.fillRect(X, Y + 14, w, 3);
+      g.fillStyle = '#8a5a34'; g.fillRect(X, Y - 4, w, 18);
+      g.fillStyle = '#6b4226'; for (let i = 8; i < w; i += 16) g.fillRect(X + i, Y, 1, 13);
+      g.fillStyle = '#c18a55'; g.fillRect(X - 1, Y - 8, w + 2, 5); g.fillStyle = '#d9a46c'; g.fillRect(X - 1, Y - 8, w + 2, 1);
+      for (const i of [6, 20, 40]) { g.fillStyle = '#c9873f'; g.fillRect(X + i, Y - 12, 8, 4); g.fillStyle = '#e0a75a'; g.fillRect(X + i + 1, Y - 12, 6, 1); }
+      g.fillStyle = '#5e6b78'; g.fillRect(X + w - 14, Y - 15, 10, 7); g.fillStyle = '#8a98a6'; g.fillRect(X + w - 13, Y - 14, 8, 2);
+      break;
+    }
+    case 'table': {
+      g.fillStyle = P.shadow; g.fillRect(X + 2, Y + 12, 12, 3);
+      g.fillStyle = '#7a5233'; g.fillRect(X + 7, Y + 6, 2, 8);
+      blob(g, X + 8, Y + 4, 6, '#b07a45'); g.fillStyle = '#c99566'; g.fillRect(X + 4, Y + 1, 6, 1);
+      g.fillStyle = '#f4efe0'; g.fillRect(X + 9, Y + 1, 3, 3);
+      break;
+    }
+    case 'sacks': {
+      blob(g, X + 5, Y + 9, 5, '#e3d6b8'); blob(g, X + 11, Y + 10, 4, '#d8caa8');
+      g.fillStyle = '#b8a37c'; g.fillRect(X + 3, Y + 9, 5, 1); g.fillRect(X + 9, Y + 10, 4, 1);
+      break;
+    }
+    case 'bed': {
+      g.fillStyle = '#6b4226'; g.fillRect(X + 1, Y - 2, 14, 32);
+      g.fillStyle = '#f4f1ea'; g.fillRect(X + 3, Y, 10, 6);
+      g.fillStyle = '#6f8fd6'; g.fillRect(X + 2, Y + 8, 12, 20); g.fillStyle = '#8eaae6'; g.fillRect(X + 2, Y + 8, 12, 2);
+      g.fillStyle = '#5a76b8'; g.fillRect(X + 5, Y + 14, 7, 1); g.fillRect(X + 3, Y + 20, 8, 1);
+      break;
+    }
+    case 'desk': {
+      g.fillStyle = P.shadow; g.fillRect(X + 1, Y + 13, 30, 3);
+      g.fillStyle = '#7a5233'; g.fillRect(X + 2, Y + 6, 2, 9); g.fillRect(X + 28, Y + 6, 2, 9);
+      g.fillStyle = '#a8754a'; g.fillRect(X, Y + 2, 32, 5); g.fillStyle = '#c99566'; g.fillRect(X, Y + 2, 32, 1);
+      g.fillStyle = '#c0533f'; g.fillRect(X + 10, Y - 2, 10, 5); g.fillStyle = '#e8c36a'; g.fillRect(X + 11, Y - 1, 1, 3);
+      if (Math.floor(T * 2) % 2 === 0) { g.fillStyle = '#ffcc4d'; g.fillRect(X + 22, Y - 6, 1, 3); g.fillRect(X + 21, Y - 5, 3, 1); }
+      break;
+    }
+    case 'boxes': {
+      g.fillStyle = P.shadow; g.fillRect(X + 1, Y + 29, 30, 3);
+      g.fillStyle = '#b88f5c'; g.fillRect(X + 2, Y + 14, 14, 16); g.fillRect(X + 16, Y + 16, 14, 14);
+      g.fillStyle = '#c9a06a'; g.fillRect(X + 6, Y + 2, 14, 13);
+      g.fillStyle = '#e6cf9c'; g.fillRect(X + 2, Y + 20, 14, 2); g.fillRect(X + 16, Y + 21, 14, 2); g.fillRect(X + 12, Y + 2, 2, 13);
+      break;
+    }
+    case 'plant': {
+      blob(g, X + 8, Y + 2, 6, '#3f7f3c'); blob(g, X + 7, Y, 4, '#5ea84a');
+      g.fillStyle = '#b5523f'; g.fillRect(X + 4, Y + 7, 8, 7); g.fillStyle = '#d0684f'; g.fillRect(X + 4, Y + 7, 8, 1);
+      break;
+    }
+  }
+}
+
+function drawHouse(g, o) {
+  const X = o.x * TILE, Y = o.y * TILE, W = o.w * TILE, H = o.h * TILE;
+  const wallH = 27, wallY = Y + H - wallH;
+  g.fillStyle = P.shadow; g.fillRect(X + 3, Y + H - 1, W - 2, 4);
+  // walls
+  g.fillStyle = o.wall; g.fillRect(X + 1, wallY, W - 2, wallH);
+  g.fillStyle = shade(o.wall, -0.1); for (let yy = wallY + 5; yy < Y + H; yy += 5) g.fillRect(X + 1, yy, W - 2, 1);
+  g.fillStyle = o.trim; g.fillRect(X + 1, wallY, 2, wallH); g.fillRect(X + W - 3, wallY, 2, wallH); g.fillRect(X + 1, Y + H - 2, W - 2, 2);
+  // roof
+  const top = Y - 2, bottom = wallY + 3, dark = shade(o.roof, -0.22), light = shade(o.roof, 0.18);
+  for (let yy = top; yy < bottom; yy++) {
+    const i = yy - top, inset = Math.max(0, 5 - i);
+    g.fillStyle = o.roof; g.fillRect(X - 3 + inset, yy, W + 6 - inset * 2, 1);
+  }
+  g.fillStyle = dark;
+  for (let yy = top + 6; yy < bottom - 2; yy += 5) {
+    g.fillRect(X - 3, yy, W + 6, 1);
+    for (let xx = X - 1 + ((yy / 5) % 2) * 3; xx < X + W + 2; xx += 6) g.fillRect(xx, yy - 3, 1, 3);
+  }
+  g.fillStyle = light; g.fillRect(X + 2, top, W - 4, 2);
+  g.fillStyle = dark; g.fillRect(X - 3, bottom - 2, W + 6, 2);
+  // chimney + smoke
+  if (o.chimney) {
+    const cx = X + W - 20;
+    g.fillStyle = '#8a4232'; g.fillRect(cx, top - 8, 8, 12); g.fillStyle = '#a5523f'; g.fillRect(cx + 1, top - 8, 6, 2);
+    for (let i = 0; i < 4; i++) {
+      const ph = (T * 0.35 + i / 4) % 1;
+      const a = (1 - ph) * 0.55;
+      blob(g, Math.round(cx + 4 + Math.sin(ph * 6 + i) * 3 + ph * 6), Math.round(top - 11 - ph * 22), Math.round(1 + ph * 3), `rgba(245,242,236,${a.toFixed(2)})`);
+    }
+  }
+  // windows
+  const dx = o.door.x * TILE;
+  for (const wx of [X + 8, X + W - 22]) {
+    if (Math.abs(wx - dx) < 14) continue;
+    g.fillStyle = '#f4efe0'; g.fillRect(wx, wallY + 5, 14, 12);
+    g.fillStyle = '#ffd98a'; g.fillRect(wx + 1, wallY + 6, 12, 10);
+    g.fillStyle = '#fff1c4'; g.fillRect(wx + 2, wallY + 7, 3, 2);
+    g.fillStyle = o.trim; g.fillRect(wx + 6, wallY + 6, 2, 10); g.fillRect(wx + 1, wallY + 10, 12, 1);
+    g.fillStyle = '#4f8f3a'; g.fillRect(wx - 1, wallY + 17, 16, 3);
+    g.fillStyle = '#f37ca0'; g.fillRect(wx + 1, wallY + 16, 2, 2); g.fillRect(wx + 7, wallY + 16, 2, 2);
+    g.fillStyle = '#ffd35c'; g.fillRect(wx + 4, wallY + 16, 2, 2); g.fillRect(wx + 11, wallY + 16, 2, 2);
+  }
+  // door
+  const dY = wallY + 6;
+  g.fillStyle = shade(o.trim, -0.25); g.fillRect(dx + 1, dY - 1, 14, Y + H - dY + 1);
+  g.fillStyle = shade(o.trim, 0.12); g.fillRect(dx + 2, dY, 12, Y + H - dY);
+  g.fillStyle = shade(o.trim, -0.05); g.fillRect(dx + 7, dY, 1, Y + H - dY);
+  g.fillStyle = '#ffcc4d'; g.fillRect(dx + 11, dY + 10, 2, 2);
+  g.fillStyle = '#b9b2a3'; g.fillRect(dx, Y + H, 16, 3);
+  if (o.sign === 'bread') {
+    g.fillStyle = '#5c3a22'; g.fillRect(dx + 18, wallY + 2, 1, 4); g.fillRect(dx + 30, wallY + 2, 1, 4);
+    g.fillStyle = '#f4efe0'; g.fillRect(dx + 16, wallY + 5, 17, 10); g.fillStyle = '#5c3a22'; g.fillRect(dx + 16, wallY + 14, 17, 1);
+    g.fillStyle = '#c9873f'; g.fillRect(dx + 19, wallY + 8, 11, 5); g.fillStyle = '#e0a75a'; g.fillRect(dx + 20, wallY + 8, 9, 1);
+    g.fillStyle = '#8a5a2e'; g.fillRect(dx + 22, wallY + 9, 1, 3); g.fillRect(dx + 26, wallY + 9, 1, 3);
+  }
+  if (o.mailbox) {
+    const mx = X + W + 1;
+    g.fillStyle = '#6b4226'; g.fillRect(mx + 3, Y + H - 12, 2, 12);
+    g.fillStyle = '#c4433f'; g.fillRect(mx, Y + H - 17, 8, 6); g.fillStyle = '#e06a5a'; g.fillRect(mx, Y + H - 17, 8, 1);
+  }
+}
+
+/* ============================================================
+   Characters
+   ============================================================ */
+const PLAYER_LOOK = { skin: '#f2c7a5', hair: '#5a3b2a', shirt: '#5b8fd1', pants: '#3d4a6b', shoe: '#3a2a22', style: 'short' };
+
+function drawPerson(g, x, y, L, dir, walkT, mouth) {
+  x = Math.round(x); y = Math.round(y);
+  const R = (c, a, b, w, h) => { g.fillStyle = c; g.fillRect(x + a, y + b, w, h); };
+  const step = walkT > 0 ? Math.floor(walkT * 9) % 2 : -1;
+  const l1 = step === 0 ? 1 : 0, l2 = step === 1 ? 1 : 0;
+  const side = dir === 'left' || dir === 'right';
+  R('rgba(20,30,20,.25)', -5, -1, 10, 2); R('rgba(20,30,20,.25)', -4, 1, 8, 1);
+  // legs
+  if (L.skirt) {
+    R(L.legs, -3, -4 - l1, 2, 3); R(L.legs, 1, -4 - l2, 2, 3);
+    R(L.shoe, -3, -1 - l1, 2, 1); R(L.shoe, 1, -1 - l2, 2, 1);
+  } else {
+    R(L.pants, -3, -6 - l1, 2, 5); R(L.pants, 1, -6 - l2, 2, 5);
+    R(L.shoe, -3, -1 - l1, 2, 1); R(L.shoe, 1, -1 - l2, 2, 1);
+  }
+  // torso
+  if (side) R(L.shirt, -3, -11, 6, 6); else R(L.shirt, -4, -11, 8, 6);
+  R(shade(L.shirt, -0.18), side ? -3 : -4, -6, side ? 6 : 8, 1);
+  if (L.skirt) { R(L.skirt, -4, -7, 8, 3); R(shade(L.skirt, -0.2), -4, -5, 8, 1); }
+  if (L.apron) {
+    if (dir === 'down') { R(L.apron, -3, -10, 6, 6); R(shade(L.apron, -0.1), -3, -5, 6, 1); }
+    else if (side) R(L.apron, dir === 'left' ? -3 : 1, -10, 2, 6);
+  }
+  // arms
+  const sw = step === -1 ? 0 : (step ? 1 : -1);
+  if (side) { R(shade(L.shirt, -0.1), -1, -11, 2, 4); R(L.skin, -1, -7, 2, 1); }
+  else {
+    R(L.shirt, -5, -11 + sw, 1, 4); R(L.shirt, 4, -11 - sw, 1, 4);
+    R(L.skin, -5, -7 + sw, 1, 1); R(L.skin, 4, -7 - sw, 1, 1);
+  }
+  // head
+  R(L.skin, -4, -18, 8, 7);
+  if (dir === 'down') {
+    R('#2b2030', -2, -15, 1, 2); R('#2b2030', 1, -15, 1, 2);
+    if (L.blush) { R('#f19a9a', -3, -13, 1, 1); R('#f19a9a', 2, -13, 1, 1); }
+    if (mouth) R('#7a3b3b', -1, -13, 2, 1);
+  } else if (dir === 'left') { R('#2b2030', -3, -15, 1, 2); }
+  else if (dir === 'right') { R('#2b2030', 2, -15, 1, 2); }
+  // hair / hats
+  const H = L.hair;
+  if (dir === 'up') R(H, -5, -19, 10, 8);
+  else {
+    R(H, -4, -19, 8, 3);
+    if (dir === 'down') { R(H, -5, -18, 1, 4); R(H, 4, -18, 1, 4); R(H, -4, -16, 2, 1); }
+    else if (dir === 'left') { R(H, 0, -18, 5, 5); }
+    else { R(H, -5, -18, 5, 5); }
+  }
+  if (L.style === 'bun') { R(H, -2, -21, 4, 2); if (L.hair2) R(L.hair2, dir === 'up' ? 0 : -1, -19, 1, 2); }
+  if (L.style === 'beanie') {
+    R(L.hat, -5, -21, 10, 4); R(shade(L.hat, -0.25), -5, -18, 10, 1); R(shade(L.hat, 0.2), -4, -21, 3, 1);
+  }
+  if (L.style === 'straw') {
+    R(L.straw, -4, -22, 8, 4); R(L.ribbon, -4, -19, 8, 1);
+    R(L.straw, -7, -18, 14, 1); R(shade(L.straw, -0.2), -7, -17, 14, 1);
+  }
+}
+
+function drawPortrait(canvas, look, mouth) {
+  const g = canvas.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, canvas.width, canvas.height);
+  g.fillStyle = look.bg || '#2a2633'; g.fillRect(0, 0, canvas.width, canvas.height);
+  g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(0, 14, canvas.width, 6);
+  drawPerson(g, 12, 26, look, 'down', 0, mouth);
+}
+
+/* ============================================================
+   World setup
+   ============================================================ */
+const MAPS = {
+  village: finishMap(buildVillage()),
+  bakery: finishMap(buildBakery()),
+  home: finishMap(buildHome()),
+};
+const NPCS = [
+  { id: 'marisol', map: 'bakery', tx: 4, ty: 3, home: 'down' },
+  { id: 'theo', map: 'village', tx: 26, ty: 21, home: 'down', fishing: true },
+  { id: 'june', map: 'village', tx: 31, ty: 9, home: 'left' },
+];
+for (const n of NPCS) { n.x = n.tx * TILE + 8; n.y = n.ty * TILE + 12; n.dir = n.home; }
+
+const player = { x: state.x, y: state.y, dir: 'down', walk: 0 };
+let cur = MAPS.village;
+
+/* ============================================================
+   Canvas + camera
+   ============================================================ */
+const canvas = $('#world'), ctx = canvas.getContext('2d');
+const buf = document.createElement('canvas'), bg = buf.getContext('2d');
+let scale = 3, viewW = 320, viewH = 200, dpr = 1;
+function resize() {
+  const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight;
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  scale = clamp(Math.floor(Math.min(w / (TILE * 15), h / (TILE * 10))), 2, 4);
+  viewW = Math.ceil(w / scale); viewH = Math.ceil(h / scale);
+  buf.width = viewW; buf.height = viewH;
+  canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+}
+addEventListener('resize', resize);
+resize();
+
+const cam = { x: 0, y: 0 };
+function updateCamera() {
+  const mw = cur.W * TILE, mh = cur.H * TILE;
+  cam.x = mw <= viewW ? Math.round((mw - viewW) / 2) : Math.round(clamp(player.x - viewW / 2, 0, mw - viewW));
+  // while talking, lift the scene so the dialogue box doesn't cover the villager
+  const lift = mode === 'talk' ? Math.round(viewH * 0.24) : 0;
+  cam.y = mh <= viewH ? Math.round((mh - viewH) / 2) + (mode === 'talk' ? Math.round(viewH * 0.18) : 0) : Math.round(clamp(player.y - 8 - viewH / 2 + lift, 0, mh - viewH + lift));
+}
+
+/* ============================================================
+   Input
+   ============================================================ */
+const keys = { up: false, down: false, left: false, right: false };
+const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
+let mode = 'title'; // title | play | talk | journal
+
+function typingInField(e) { const t = e.target; return t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT'); }
+
+addEventListener('keydown', e => {
+  if (mode === 'title') return;
+  if (mode === 'journal') {
+    if (e.code === 'Escape' || (e.code === 'KeyJ' && !typingInField(e))) { e.preventDefault(); closeJournal(); }
+    return;
+  }
+  if (mode === 'talk') {
+    if (e.code === 'Escape') { e.preventDefault(); closeTalk(); return; }
+    if (typingInField(e)) return;
+    if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyE') { e.preventDefault(); advance(); }
+    return;
+  }
+  if (typingInField(e)) return;
+  if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
+  else if (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (!e.repeat) interact(); }
+  else if (e.code === 'KeyJ') { e.preventDefault(); openJournal(); }
+});
+addEventListener('keyup', e => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+// touch
+const isTouch = matchMedia('(pointer: coarse)').matches;
+if (isTouch) $('#hint').style.bottom = 'calc(180px + env(safe-area-inset-bottom, 0px))';
+document.querySelectorAll('.dpad button').forEach(b => {
+  const k = b.dataset.k;
+  const on = e => { e.preventDefault(); keys[k] = true; };
+  const off = e => { e.preventDefault(); keys[k] = false; };
+  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off);
+  b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
+});
+$('#btnA').addEventListener('click', () => { if (mode === 'play') interact(); else if (mode === 'talk') advance(); });
+
+/* ============================================================
+   Movement + collision
+   ============================================================ */
+function npcsHere() { return NPCS.filter(n => n.map === cur.id); }
+function solidAt(tx, ty) {
+  if (tx < 0 || ty < 0 || tx >= cur.W || ty >= cur.H) return 1;
+  const s = cur.solid[ty][tx];
+  if (s) return s;
+  for (const n of npcsHere()) if (n.tx === tx && n.ty === ty) return 1;
+  return 0;
+}
+function collide(x, y) {
+  let hit = 0;
+  for (const [px, py] of [[x - 5, y - 4], [x + 4, y - 4], [x - 5, y], [x + 4, y]]) {
+    const s = solidAt(Math.floor(px / TILE), Math.floor(py / TILE));
+    if (s && s.door) return s;
+    if (s) hit = s;
+  }
+  return hit;
+}
+let doorCooldown = 0;
+function tryMove(dx, dy) {
+  const hit = collide(player.x + dx, player.y + dy);
+  if (!hit) { player.x += dx; player.y += dy; return; }
+  if (hit.door && dy < 0 && doorCooldown <= 0) { doorCooldown = 0.6; useDoor(hit.door); }
+}
+const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+
+function update(dt) {
+  T += dt;
+  doorCooldown -= dt;
+  if (typing) tickTyping(dt);
+  if (fade) {
+    fade.t += dt;
+    if (!fade.done && fade.t >= fade.dur / 2) { fade.done = true; fade.mid(); }
+    if (fade.t >= fade.dur) fade = null;
+  }
+  if (mode !== 'play' || fade) { player.walk = 0; return; }
+  let ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+  if (ix || iy) {
+    if (ix && iy) { ix *= 0.7071; iy *= 0.7071; }
+    player.dir = Math.abs(ix) > Math.abs(iy) ? (ix < 0 ? 'left' : 'right') : (iy < 0 ? 'up' : 'down');
+    tryMove(ix * SPEED * dt, 0); tryMove(0, iy * SPEED * dt);
+    player.walk += dt;
+  } else player.walk = 0;
+  // interior exit
+  if (cur.id !== 'village') {
+    const tx = Math.floor(player.x / TILE), ty = Math.floor((player.y - 2) / TILE);
+    if (cur.g[ty] && cur.g[ty][tx] === 'E' && player.dir === 'down' && player.walk > 0) exitInterior();
+  }
+  updateHint();
+}
+
+/* ============================================================
+   Doors + transitions
+   ============================================================ */
+let fade = null;
+function transition(fn) { fade = { t: 0, dur: 0.5, mid: fn, done: false }; }
+function useDoor(house) {
+  if (house.enter) {
+    transition(() => {
+      const m = MAPS[house.enter];
+      m.returnTo = { x: house.door.x * TILE + 8, y: (house.door.y + 1) * TILE + 10 };
+      cur = m; player.x = m.spawn.x * TILE + 8; player.y = m.spawn.y * TILE + 10; player.dir = 'up';
+      $('#place').textContent = m.label; save();
+    });
+  } else if (house.locked) {
+    showMessage('', house.locked);
+  }
+}
+function exitInterior() {
+  const back = cur.returnTo || { x: 13 * TILE + 8, y: 8 * TILE + 10 };
+  transition(() => {
+    cur = MAPS.village; player.x = back.x; player.y = back.y; player.dir = 'down';
+    $('#place').textContent = cur.label; save();
+  });
+}
+
+/* ============================================================
+   Interaction targets
+   ============================================================ */
+function facingTile() {
+  const [dx, dy] = DIRV[player.dir];
+  return { x: Math.floor((player.x + dx * 11) / TILE), y: Math.floor((player.y - 4 + dy * 12) / TILE) };
+}
+function talkTarget() {
+  const [dx, dy] = DIRV[player.dir];
+  let best = null, bd = 1e9;
+  for (const n of npcsHere()) {
+    const ox = n.x - player.x, oy = n.y - player.y, d = Math.hypot(ox, oy);
+    if (d > 40) continue;
+    if ((ox * dx + oy * dy) < d * 0.55) continue;
+    if (d < bd) { bd = d; best = n; }
+  }
+  return best;
+}
+function interTarget() {
+  const f = facingTile();
+  return cur.inter.find(i => f.x >= i.x && f.x < i.x + (i.w || 1) && f.y >= i.y && f.y < i.y + (i.h || 1)) || null;
+}
+let hintText = '';
+function updateHint() {
+  let t = '';
+  const n = talkTarget();
+  if (n) t = (isTouch ? 'Tap Talk: ' : 'E: talk to ') + (state.v[n.id].met ? CHARS[n.id].name : 'someone');
+  else { const i = interTarget(); if (i) t = (isTouch ? 'Tap Talk: ' : 'E: ') + i.label.toLowerCase(); }
+  if (t !== hintText) { hintText = t; const h = $('#hint'); h.textContent = t; h.hidden = !t; }
+}
+function interact() {
+  if (mode !== 'play' || fade) return;
+  const n = talkTarget();
+  if (n) { startTalk(n); return; }
+  const i = interTarget();
+  if (!i) return;
+  if (i.action === 'journal') { openJournal(); return; }
+  if (i.x === 20 && i.y === 10 && cur.id === 'village') { state.boardRead = true; save(); }
+  showMessage(i.label === 'Read' ? 'Notice board' : '', i.pages);
+}
+
+/* ============================================================
+   Rendering
+   ============================================================ */
+function drawNPC(g, n) {
+  const c = CHARS[n.id];
+  if (n.fishing && n.dir === 'down') {
+    g.fillStyle = '#5c3d26'; g.fillRect(n.x + 4, n.y - 12, 1, 6);
+    g.fillStyle = '#8a5a34'; g.fillRect(n.x + 5, n.y - 18, 1, 7); g.fillRect(n.x + 6, n.y - 22, 1, 5);
+    const by = n.y + 12 + Math.round(Math.sin(T * 2.2));
+    g.fillStyle = 'rgba(255,255,255,.55)';
+    for (let yy = n.y - 21; yy < by; yy += 2) g.fillRect(n.x + 7 + Math.floor((yy - n.y + 21) / 14), yy, 1, 1);
+    g.fillStyle = '#e04b3d'; g.fillRect(n.x + 8, by, 2, 2); g.fillStyle = '#fff'; g.fillRect(n.x + 8, by - 1, 2, 1);
+  }
+  const talking = convo && convo.id === n.id && typing && Math.floor(T * 8) % 2 === 0;
+  drawPerson(g, n.x, n.y, c.look, n.dir, 0, talking);
+  const v = state.v[n.id];
+  const near = mode === 'play' && talkTarget() === n;
+  if (near || (v.stage < 5 && !v.met)) {
+    const bx = n.x - 5, by = n.y - 34 + (Math.floor(T * 2.5) % 2);
+    g.fillStyle = '#0c0a10'; g.fillRect(bx - 1, by - 1, 12, 10); g.fillRect(bx + 3, by + 9, 3, 2);
+    g.fillStyle = '#f7f3ff'; g.fillRect(bx, by, 10, 8); g.fillRect(bx + 4, by + 8, 1, 1);
+    if (near) { g.fillStyle = '#0c0a10'; g.fillRect(bx + 2, by + 4, 1, 1); g.fillRect(bx + 4, by + 4, 1, 1); g.fillRect(bx + 6, by + 4, 1, 1); }
+    else { g.fillStyle = '#ff6b81'; g.fillRect(bx + 4, by + 1, 2, 4); g.fillRect(bx + 4, by + 6, 2, 1); }
+  }
+}
+
+function render() {
+  updateCamera();
+  const g = bg;
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = cur.bg; g.fillRect(0, 0, viewW, viewH);
+  g.save(); g.translate(-cam.x, -cam.y);
+  g.drawImage(cur.ground, 0, 0);
+  // water shimmer
+  if (cur.id === 'village') {
+    const x0 = Math.max(0, Math.floor(cam.x / TILE)), x1 = Math.min(cur.W - 1, Math.ceil((cam.x + viewW) / TILE));
+    const y0 = Math.max(0, Math.floor(cam.y / TILE)), y1 = Math.min(cur.H - 1, Math.ceil((cam.y + viewH) / TILE));
+    g.fillStyle = P.waterHi;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (cur.g[y][x] !== '~') continue;
+      const ph = (T * 0.6 + hash(x, y) * 6) % 6;
+      if (ph < 1.4) g.fillRect(x * TILE + 3 + Math.floor(hash(y, x) * 8), y * TILE + 6 + Math.floor(ph * 2), 4, 1);
+    }
+  }
+  const list = [];
+  for (const o of cur.objs) list.push([o.sortY, () => drawObj(g, o)]);
+  for (const n of npcsHere()) list.push([n.y, () => drawNPC(g, n)]);
+  list.push([player.y, () => drawPerson(g, player.x, player.y, PLAYER_LOOK, player.dir, player.walk, false)]);
+  list.sort((a, b) => a[0] - b[0]);
+  for (const [, f] of list) f();
+  // butterflies near June's garden
+  if (cur.id === 'village') {
+    for (let i = 0; i < 2; i++) {
+      const bx = Math.round(30 * TILE + Math.sin(T * 0.7 + i * 3) * 30 + i * 10), by = Math.round(9 * TILE + Math.sin(T * 1.3 + i) * 14 - 8);
+      const flap = Math.floor(T * 8 + i) % 2;
+      g.fillStyle = i ? '#f7a8c4' : '#fff6e0';
+      g.fillRect(bx - 2, by + (flap ? 0 : 1), 2, flap ? 2 : 1); g.fillRect(bx + 1, by + (flap ? 0 : 1), 2, flap ? 2 : 1);
+      g.fillStyle = '#2b2030'; g.fillRect(bx, by, 1, 2);
+    }
+  }
+  g.restore();
+  if (fade) {
+    const a = 1 - Math.abs(fade.t / fade.dur * 2 - 1);
+    g.fillStyle = `rgba(12,10,16,${clamp(a, 0, 1).toFixed(3)})`; g.fillRect(0, 0, viewW, viewH);
+  }
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(buf, 0, 0, viewW * scale * dpr, viewH * scale * dpr);
+}
+
+/* ============================================================
+   Sound (tiny voice blips, like Undertale)
+   ============================================================ */
+let actx = null;
+function tone(freq, dur, vol = 0.03, type = 'square', when = 0) {
+  if (!state.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const t0 = actx.currentTime + when, o = actx.createOscillator(), gn = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    gn.gain.setValueAtTime(vol, t0); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(gn).connect(actx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+  } catch {}
+}
+const blip = f => tone(f * (0.96 + Math.random() * 0.08), 0.05, 0.02);
+function chime() { [523, 659, 784].forEach((f, i) => tone(f, 0.25, 0.035, 'triangle', i * 0.09)); }
+function lowNote() { tone(196, 0.3, 0.03, 'triangle'); }
+
+/* ============================================================
+   Dialogue box
+   ============================================================ */
+const ui = {
+  talk: $('#talk'), text: $('#talkText'), name: $('#talkName'), hearts: $('#hearts'), portrait: $('#portrait'),
+  form: $('#replyForm'), input: $('#reply'), more: $('#more'), fb: $('#feedback'), tips: $('#tips'), label: $('#replyLabel'),
+};
+let typing = null, waitCont = null, convo = null, thinkCtl = null, thinkTimer = null;
+
+function say(text, voice) {
+  return new Promise(res => {
+    ui.text.classList.remove('thinking');
+    ui.more.hidden = true;
+    typing = { full: text, i: 0, acc: 0, voice: voice || 280, res };
+    ui.text.textContent = '';
+  });
+}
+function tickTyping(dt) {
+  const t = typing;
+  t.acc += dt * 42;
+  while (t.acc >= 1 && t.i < t.full.length) {
+    const ch = t.full[t.i++]; t.acc -= 1;
+    if (ch !== ' ' && t.i % 2 === 0) blip(t.voice);
+    if ('.!?'.includes(ch)) t.acc -= 6; else if (ch === ',') t.acc -= 3;
+  }
+  ui.text.textContent = t.full.slice(0, t.i);
+  if (convo && convo.look && Math.floor(T * 8) % 2 !== convo.mouthState) { convo.mouthState = Math.floor(T * 8) % 2; drawPortrait(ui.portrait, convo.look, convo.mouthState === 0); }
+  if (t.i >= t.full.length) finishTyping();
+}
+function finishTyping() {
+  if (!typing) return;
+  const t = typing; typing = null;
+  ui.text.textContent = t.full;
+  if (convo && convo.look) drawPortrait(ui.portrait, convo.look, false);
+  t.res();
+}
+function waitForContinue() {
+  ui.more.hidden = false;
+  return new Promise(res => { waitCont = res; });
+}
+function advance() {
+  if (typing) { typing.i = typing.full.length; tickTyping(0); return; }
+  if (waitCont) { const r = waitCont; waitCont = null; ui.more.hidden = true; r(); }
+}
+ui.text.addEventListener('click', advance);
+ui.more.addEventListener('click', advance);
+
+function openBox({ name, look, stage }) {
+  mode = 'talk';
+  for (const k in keys) keys[k] = false;
+  $('#hint').hidden = true; hintText = '';
+  $('#touch').hidden = true;
+  ui.talk.hidden = false; ui.fb.hidden = true; ui.tips.hidden = true; ui.form.hidden = true;
+  ui.name.textContent = name || '';
+  ui.name.hidden = !name;
+  ui.portrait.hidden = !look;
+  if (look) drawPortrait(ui.portrait, look, false);
+  ui.hearts.hidden = stage == null;
+  if (stage != null) ui.hearts.innerHTML = heartsHTML(stage);
+}
+function closeTalk() {
+  if (thinkCtl) { thinkCtl.abort(); thinkCtl = null; }
+  clearInterval(thinkTimer);
+  if (typing) { const t = typing; typing = null; t.res(); }
+  if (waitCont) { const r = waitCont; waitCont = null; r(); }
+  if (convo && convo.npc) convo.npc.dir = convo.npc.home;
+  convo = null;
+  ui.talk.hidden = true;
+  mode = 'play';
+  $('#touch').hidden = !isTouch;
+  ui.input.blur();
+  save();
+}
+
+async function showMessage(title, pages) {
+  const me = { kind: 'msg' };
+  convo = me;
+  openBox({ name: title });
+  for (const p of pages) {
+    await say(p, 280);
+    if (convo !== me) return;
+    await waitForContinue();
+    if (convo !== me) return;
+  }
+  closeTalk();
+}
+
+function faceToward(n) {
+  const dx = player.x - n.x, dy = player.y - n.y;
+  return Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+}
+
+async function startTalk(n) {
+  const c = CHARS[n.id], v = state.v[n.id];
+  n.dir = faceToward(n);
+  const me = { kind: 'npc', id: n.id, npc: n, look: c.look, mouthState: -1 };
+  convo = me;
+  openBox({ name: c.name, look: c.look, stage: v.stage });
+  let line, closing = false;
+  if (v.stage >= 5) { line = c.after[v.a % c.after.length]; v.a++; closing = true; }
+  else if (!v.met) { v.met = true; line = c.beats[0].line; }
+  else line = c.beats[v.stage].again;
+  v.turns = [{ who: 'npc', text: line }];
+  save();
+  await say(line, c.voice);
+  if (convo !== me) return;
+  if (closing) { await waitForContinue(); if (convo === me) closeTalk(); return; }
+  showInput(c, v);
+}
+
+function showInput(c, v) {
+  ui.form.hidden = false;
+  ui.label.textContent = `Your reply to ${c.name}`;
+  ui.input.value = '';
+  if (!isTouch) setTimeout(() => ui.input.focus(), 0);
+  convo.phase = 'input';
+  renderTips(v.stage);
+}
+ui.input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ui.form.requestSubmit(); }
+});
+ui.form.addEventListener('submit', e => { e.preventDefault(); sendReply(ui.input.value); });
+$('#btnLeave').addEventListener('click', closeTalk);
+$('#btnTips').addEventListener('click', () => { ui.tips.hidden = !ui.tips.hidden; });
+function renderTips(stage) {
+  ui.tips.innerHTML = `<h3>How to listen</h3>${MOVES_HTML}<p class="trust-note">${'&#9829;'.repeat(stage) || 'No hearts yet'}: ${esc(TRUST_TIPS[stage])}</p>`;
+}
+
+async function sendReply(raw) {
+  const text = raw.trim();
+  if (!convo || convo.kind !== 'npc' || convo.phase !== 'input' || !text) return;
+  const me = convo, c = CHARS[me.id], v = state.v[me.id];
+  me.phase = 'thinking';
+  ui.form.hidden = true; ui.tips.hidden = true; ui.fb.hidden = true;
+  v.turns.push({ who: 'you', text });
+  let dots = 0;
+  ui.text.classList.add('thinking');
+  ui.text.textContent = `${c.name} takes in what you said`;
+  clearInterval(thinkTimer);
+  thinkTimer = setInterval(() => { dots = (dots + 1) % 4; ui.text.textContent = `${c.name} takes in what you said` + '.'.repeat(dots); }, 400);
+
+  let r;
+  try { r = await judge(c, v, text); }
+  catch (e) { clearInterval(thinkTimer); return; }
+  clearInterval(thinkTimer);
+  if (convo !== me) return;
+
+  const before = v.stage;
+  state.replies++;
+  for (const s of r.skills) state.skills[s] = (state.skills[s] || 0) + 1;
+  if (r.listened) { v.stage = Math.min(5, v.stage + 1); state.passed++; chime(); }
+  else if (r.harmful) lowNote();
+  v.coach = r.coach;
+  v.turns.push({ who: 'npc', text: r.reply });
+  ui.hearts.innerHTML = heartsHTML(v.stage, r.listened ? v.stage - 1 : -1);
+  showFeedback(r, c);
+  save();
+
+  await say(r.reply, c.voice);
+  if (convo !== me) return;
+  if (r.harmful) { await waitForContinue(); if (convo === me) closeTalk(); return; }
+  if (v.stage >= 5 && before < 5) {
+    if (!state.keepsakes.includes(c.keepsake)) state.keepsakes.push(c.keepsake);
+    save();
+    await waitForContinue();
+    if (convo !== me) return;
+    closeTalk();
+    toast(`${c.name}'s story is complete. You received: ${c.keepsake}.`);
+    return;
+  }
+  showInput(c, v);
+}
+
+function showFeedback(r, c) {
+  const fb = ui.fb;
+  fb.className = 'fb ' + (r.harmful ? 'hurt' : r.listened ? 'warm' : 'cool');
+  const head = r.harmful ? `${c.name} is hurt` : r.listened ? `${c.name} opens up` : `${c.name} holds back`;
+  let html = `<div class="fb-head">${r.listened ? HEART : ''}<span>${esc(head)}</span>${r.source === 'local' ? '<span style="opacity:.6">· scripted</span>' : ''}</div>`;
+  if (r.skills.length) html += `<div class="chips">${r.skills.map(s => `<span class="chip">${esc(SKILLS[s])}</span>`).join('')}</div>`;
+  if (state.coach && r.coach) html += `<p class="coach">${esc(r.coach)}</p>`;
+  fb.innerHTML = html;
+  fb.hidden = false;
+}
+
+let toastTimer = null;
+function toast(msg, ms = 4200) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms);
+}
+
+/* ============================================================
+   The listening judge
+   With Claude (on claude.ai) it reads the reply and writes the
+   villager's words. Elsewhere a simple keyword check stands in.
+   ============================================================ */
+let sample = null, claudeOff = false;
+
+const OPINION_RULE = [
+  n => `Trust is new: opinions, advice and the player's own stories fail here, unless it is one short clause that immediately hands attention back to ${n}.`,
+  n => `Trust is new: opinions, advice and the player's own stories fail here, unless it is one short clause that immediately hands attention back to ${n}.`,
+  n => `Some trust: the player may briefly share a related feeling or experience of their own (skill "share") if it is short and turns attention back to ${n}. Advice and opinions still fail.`,
+  n => `Some trust: the player may briefly share a related feeling or experience of their own (skill "share") if it is short and turns attention back to ${n}. Advice and opinions still fail.`,
+  n => `Deep trust: the player may offer a gentle, honest opinion or perspective (skill "opinion"), especially if ${n} asked for one, as long as they first show they understood how ${n} feels. Pushy, preachy or one-sided advice still fails.`,
+];
+
+function buildPrompt(c, v, text) {
+  const s = v.stage, next = c.beats[s + 1].line;
+  const told = c.beats.slice(0, s + 1).map(b => '- ' + b.line).join('\n');
+  const prior = v.turns.slice(0, -1).slice(-8).map(t => (t.who === 'npc' ? c.name : 'Player') + ': ' + t.text).join('\n');
+  return `You are running one conversation in "Listening", a cozy village game that helps the player practise active listening. Do two jobs: judge the player's latest reply, and write what the villager says next.
+
+VILLAGER
+${c.name}, ${c.bio}
+Voice: ${c.style}
+What ${c.name} has already shared with the player:
+${told}
+Trust: ${s} of 5 hearts.
+${s === 4 ? `If the player listens well now, ${c.name}'s story resolves, and their closing words should carry this:` : `The next thing ${c.name} is holding back (share it ONLY if the player listens well):`}
+"${next}"
+
+THE PLAYER
+A newcomer to the village${state.name ? ` named ${state.name}` : ''}. This game is practice for them, so be encouraging.
+
+THIS VISIT SO FAR
+${prior}
+
+THE PLAYER'S REPLY
+"""${text}"""
+
+HOW TO JUDGE
+Pass ("listened": true) when the reply shows real attention to what ${c.name} said or feels, even if it's clumsy: reflecting it back in their own words, naming or validating a feeling, a gentle open question about ${c.name}'s experience, or simply staying with them.
+Fail when the reply: gives advice or tries to fix things, minimises or silver-lines ("at least...", "everything happens for a reason"), turns the talk to the player's own story, judges, changes the subject, is small talk that ignores what was said, could have been said to anyone, or is a bare "ok" or "cool".
+${OPINION_RULE[s](c.name)}
+Mocking, cruel or prejudiced replies are harmful: set "trust" to -1.
+
+WHAT ${c.name.toUpperCase()} SAYS NEXT
+1 to 4 short sentences, plain text, in ${c.name}'s voice, with no stage directions and no surrounding quotation marks. If the player listened, ${c.name} warms up and shares the text above in their own words, keeping its key facts and names. If not, ${c.name} answers believably but guardedly and shares nothing new. If harmful, ${c.name} politely ends the conversation. Never lecture the player about listening.
+
+Reply with only this JSON:
+{"listened": true or false, "trust": 1 or 0 or -1, "skills": [zero or more of "reflect","feeling","open_q","validate","present","share","opinion"], "coach": "one warm, specific sentence for the player, at most 30 words: if they passed, what worked; if not, one thing to try, with a short example phrase", "reply": "what ${c.name} says"}`;
+}
+
+async function judge(c, v, text) {
+  if (sample && !claudeOff) {
+    thinkCtl = new AbortController();
+    try {
+      const r = await sample.json(buildPrompt(c, v, text), { modelTier: 'default', effort: 'low', cache: false, signal: thinkCtl.signal });
+      thinkCtl = null;
+      return normalize(r, c, v, text);
+    } catch (e) {
+      thinkCtl = null;
+      const code = e && e.code;
+      if (code === 'cancelled') throw e;
+      if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(code)) {
+        claudeOff = true; updateBadge();
+        toast('Claude isn\'t available here, so villagers will use their scripted lines.');
+      } else if (code === 'rate_limited') toast('Claude needs a break (usage limit reached). This reply uses the scripted check.');
+      else if (code === 'session_expired') toast('Sign in to claude.ai again to bring Claude back. Using the scripted check for now.');
+      else toast('Couldn\'t reach Claude just now. This reply uses the scripted check.');
+    }
+  }
+  return judgeLocal(c, v, text);
+}
+
+function normalize(r, c, v, text) {
+  if (!r || typeof r !== 'object' || typeof r.listened !== 'boolean') return judgeLocal(c, v, text);
+  let reply = typeof r.reply === 'string' ? r.reply.trim().replace(/^["“]+|["”]+$/g, '') : '';
+  const harmful = r.trust === -1 && !r.listened;
+  if (!reply) reply = scriptedReply(c, v, r.listened, harmful);
+  return {
+    listened: r.listened, harmful,
+    skills: (Array.isArray(r.skills) ? r.skills : []).filter(k => SKILLS[k]).filter((k, i, a) => a.indexOf(k) === i).slice(0, 4),
+    coach: String(r.coach || '').slice(0, 260), reply, source: 'claude',
+  };
+}
+function scriptedReply(c, v, listened, harmful) {
+  if (harmful) return c.hurt;
+  if (listened) return c.beats[v.stage + 1].line;
+  return c.guarded[(v.g++) % c.guarded.length];
+}
+
+const FEEL = ['sad', 'grief', 'griev', 'hurt', 'lonely', 'alone', 'scared', 'afraid', 'fear', 'terrif', 'anxious', 'nervous', 'worr', 'guilt', 'ashamed', 'shame', 'angry', 'frustrat', 'overwhelm', 'heavy', 'heartbr', 'miss', 'happy', 'joy', 'excit', 'thrill', 'proud', 'reliev', 'hope', 'glad', 'love', 'delight', 'torn', 'conflict', 'exhaust', 'tired', 'numb', 'stuck', 'trapped', 'sick', 'pain', 'hard', 'tough', 'wonderful', 'amazing', 'beautiful', 'precious', 'brave'];
+const STOP = new Set('that this with have from they them what your just been were there their about would could should which when then than into some time like know because really again today little every while those these still only very also never always'.split(' '));
+
+function judgeLocal(c, v, text) {
+  const t = ' ' + text.toLowerCase().replace(/[’‘]/g, "'") + ' ';
+  const words = t.match(/[a-z']+/g) || [];
+  const skills = []; const issues = []; let score = 0;
+  const s = v.stage;
+  if (/(sounds like|it sounds|seems like|it seems|i hear|you're saying|you are saying|\bso you\b|you feel|you're feeling|you felt|you must|that must|must be|must have|you've been|you have been)/.test(t)) { skills.push('reflect'); score += 2; }
+  if (FEEL.some(f => t.includes(' ' + f) || t.includes(f + ' '))) { skills.push('feeling'); score += 1; }
+  if (t.includes('?')) {
+    if (/(what|how|tell me|would you|could you|do you want to|want to talk|what's|how's)/.test(t)) { skills.push('open_q'); score += 2; }
+    else score += 0.5;
+  }
+  if (/(makes sense|of course|no wonder|that's (a lot|so hard|hard|huge|wonderful|amazing|incredible|big)|i'm (so )?sorry|that sounds (hard|painful|lonely|wonderful|exciting|scary|heavy|amazing)|anyone would|understandable|that's okay|it's okay to)/.test(t)) { skills.push('validate'); score += 1.5; }
+  const last = (v.turns.filter(x => x.who === 'npc').pop() || { text: '' }).text.toLowerCase();
+  const lastWords = new Set((last.match(/[a-z']+/g) || []).filter(w => w.length > 3 && !STOP.has(w)));
+  const overlap = words.filter(w => lastWords.has(w)).filter((w, i, a) => a.indexOf(w) === i).length;
+  if (overlap >= 2) { skills.push('present'); score += 1; } else if (overlap === 1) score += 0.5;
+
+  const harmful = /(gross|disgusting|what's wrong with you|\bsin\b|unnatural|just a phase|stupid|shut up|who cares|so what|boring|get over it|man up|pathetic)/.test(t);
+  if (/(at least|better place|everything happens|bright side|could be worse|move on|not a big deal|no big deal|it's fine|don't be sad|cheer up)/.test(t)) { issues.push('minimize'); score -= 3; }
+  if (/(you should|you need to|you have to|why don't you|have you tried|you could just|\bjust (tell|get|move|let|try|do|stop|go)|you'll be fine|don't worry|if i were you)/.test(t)) {
+    if (s >= 4 && score >= 2) skills.push('opinion'); else { issues.push('advice'); score -= 2; }
+  }
+  if (/( me too|when i was|i had a|i know exactly|i remember when|that happened to me|same thing happened|my (mom|mum|mother|dad|father|grandma|grandmother|ex|boyfriend|girlfriend|wife|husband) )/.test(t)) {
+    if (s >= 2 && score >= 2) skills.push('share'); else { issues.push('redirect'); score -= 1.5; }
+  }
+  if (words.length < 4) { issues.push('short'); score -= 2; }
+
+  const listened = !harmful && score >= 2 && !issues.includes('minimize');
+  let coach;
+  if (harmful) coach = 'That landed as hurtful. Listening starts with respect for who someone is and what they feel.';
+  else if (listened) coach = 'Nice. ' + (skills.includes('reflect') ? 'Saying back what you heard' : skills.includes('open_q') ? 'Asking an open question' : 'Picking up on their words') + ' helped them feel heard.';
+  else if (issues.includes('minimize')) coach = 'Try not to look for a bright side yet. Stay with how it feels for them, like: "That sounds really heavy."';
+  else if (issues.includes('advice')) coach = 'Advice can wait. First show you understand, like: "It sounds like this has been weighing on you."';
+  else if (issues.includes('redirect')) coach = 'Keep the spotlight on them for now. Try: "What has that been like for you?"';
+  else if (issues.includes('short')) coach = 'Say a little more. Echo something they told you, so they know you heard it.';
+  else coach = `Pick up on something specific ${c.name} said and reflect it back in your own words, or ask about it.`;
+  return { listened, harmful, skills: listened ? skills.filter((k, i, a) => a.indexOf(k) === i).slice(0, 4) : [], coach, reply: scriptedReply(c, v, listened, harmful), source: 'local' };
+}
+
+function updateBadge() {
+  const live = !!sample && !claudeOff;
+  $('#badgeDot').classList.toggle('live', live);
+  $('#badgeText').textContent = live ? 'Claude is listening' : 'Scripted replies';
+  $('#badge').title = live
+    ? 'Claude reads each reply and writes what villagers say. It uses your own Claude account.'
+    : 'Claude isn\'t available here, so a simple word check judges replies and villagers use scripted lines.';
+  $('#claudeNote').textContent = live
+    ? 'On claude.ai, Claude reads each reply and voices the villagers, using your Claude account. You\'ll be asked once to allow it.'
+    : 'Claude isn\'t available here, so villagers use scripted lines and a simpler word check. Open this game on claude.ai for live replies.';
+}
+
+/* ============================================================
+   Journal
+   ============================================================ */
+const tabs = $('#tabs');
+tabs.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  tabs.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  for (const id of ['people', 'how', 'me']) $('#tab-' + id).hidden = id !== b.dataset.tab;
+});
+$('#btnJournal').addEventListener('click', () => { if (mode === 'play') openJournal(); });
+$('#closeJournal').addEventListener('click', closeJournal);
+$('#journal').addEventListener('click', e => { if (e.target.id === 'journal') closeJournal(); });
+
+function openJournal() {
+  if (mode !== 'play') return;
+  mode = 'journal';
+  for (const k in keys) keys[k] = false;
+  renderJournal();
+  $('#journal').hidden = false; $('#touch').hidden = true; $('#hint').hidden = true; hintText = '';
+  $('#closeJournal').focus();
+}
+function closeJournal() {
+  $('#journal').hidden = true; mode = 'play'; $('#touch').hidden = !isTouch; save();
+}
+
+function renderJournal() {
+  const people = $('#tab-people'); people.innerHTML = '';
+  for (const id of ORDER) {
+    const c = CHARS[id], v = state.v[id];
+    const el = document.createElement('div');
+    el.className = 'person' + (v.met ? '' : ' unknown');
+    const cv = document.createElement('canvas'); cv.width = 24; cv.height = 20;
+    if (v.met) drawPortrait(cv, c.look, false);
+    else { const g = cv.getContext('2d'); g.fillStyle = '#c9ab72'; g.fillRect(0, 0, 24, 20); g.fillStyle = '#9a7b55'; g.font = '14px monospace'; g.fillText('?', 8, 15); }
+    const body = document.createElement('div');
+    if (v.met) {
+      const notes = c.beats.slice(0, Math.min(v.stage, 5) + 1).map(b => `<li>${esc(b.note)}</li>`).join('');
+      body.innerHTML = `<div class="who"><h3>${esc(c.name)}</h3><span class="hearts">${heartsHTML(v.stage)}</span></div>
+        <div class="where">${esc(c.place)}${v.stage >= 5 ? ' · story complete' : ''}</div>
+        <ul>${notes}</ul>${v.coach && state.coach ? `<p class="last">Last coaching note: ${esc(v.coach)}</p>` : ''}`;
+    } else {
+      body.innerHTML = `<div class="who"><h3>Someone you haven't met</h3></div><div class="where">${esc(c.hint)}</div>`;
+    }
+    el.append(cv, body); people.append(el);
+  }
+
+  $('#tab-how').innerHTML = `
+    <p>Active listening means showing someone you heard them before you do anything else. In Thistlewick, it's how you earn trust.</p>
+    ${MOVES_HTML}
+    <div class="avoid"><b>What makes people hold back:</b> advice too early, "at least..." silver linings, jumping to your own story, judging, or changing the subject.</div>
+    <h4>What trust allows</h4>
+    <div class="ladder">
+      <div><span>0-1 HEARTS</span><span>Keep the focus on them. Reflect, name feelings, ask open questions.</span></div>
+      <div><span>2-3 HEARTS</span><span>You can share a little of yourself, briefly, then hand it back to them.</span></div>
+      <div><span>4 HEARTS</span><span>You can offer an honest, kind opinion, once you've shown you understand.</span></div>
+    </div>
+    <p>Joy deserves listening too. When someone's happy, stay with their happiness. Ask about it, enjoy it with them, and don't rush to warnings.</p>`;
+
+  const total = Object.values(state.skills).reduce((a, b) => a + b, 0);
+  const max = Math.max(1, ...Object.values(state.skills));
+  const rows = Object.keys(SKILLS).map(k => {
+    const n = state.skills[k] || 0;
+    return `<div class="skillrow"><span>${esc(SKILLS[k])}</span><span class="bar"><i style="width:${Math.round(n / max * 100)}%"></i></span><em>${n}</em></div>`;
+  }).join('');
+  $('#tab-me').innerHTML = `
+    <div class="stats">
+      <div class="stat"><b>${state.replies}</b><span>replies given</span></div>
+      <div class="stat"><b>${state.passed}</b><span>times someone opened up</span></div>
+      <div class="stat"><b>${state.replies ? Math.round(state.passed / state.replies * 100) : 0}%</b><span>of replies that landed</span></div>
+    </div>
+    <h4>Listening skills you've used</h4>
+    ${total ? rows : '<p>Nothing yet. Talk to someone, and the skills you use will show up here.</p>'}
+    <h4>Keepsakes</h4>
+    ${state.keepsakes.length ? `<ul>${state.keepsakes.map(k => `<li>${esc(k)}</li>`).join('')}</ul>` : '<p>None yet. Villagers give you something when their story is complete.</p>'}
+    <h4>Settings</h4>
+    <div class="settings">
+      <label for="setName">Your name <input type="text" id="setName" maxlength="24" value="${esc(state.name)}"></label>
+      <label for="setCoach"><input type="checkbox" id="setCoach" ${state.coach ? 'checked' : ''}> Show coaching notes after each reply</label>
+      <label for="setSound"><input type="checkbox" id="setSound" ${state.sound ? 'checked' : ''}> Voice blips and chimes</label>
+      <div><button type="button" class="btn" id="setReset">Start the game over</button></div>
+    </div>`;
+  $('#setName').addEventListener('input', e => { state.name = e.target.value.trim(); save(); });
+  $('#setCoach').addEventListener('change', e => { state.coach = e.target.checked; save(); });
+  $('#setSound').addEventListener('change', e => { state.sound = e.target.checked; syncSound(); save(); });
+  armReset($('#setReset'), 'Tap again to erase everything');
+}
+
+function armReset(btn, confirmText) {
+  let armed = false, timer = null; const orig = btn.textContent;
+  btn.addEventListener('click', () => {
+    if (!armed) { armed = true; btn.textContent = confirmText; timer = setTimeout(() => { armed = false; btn.textContent = orig; }, 3500); return; }
+    clearTimeout(timer);
+    try { localStorage.removeItem(SAVE_KEY); } catch {}
+    const keepName = state.name;
+    state = freshState(); state.name = keepName; state.started = mode === 'journal';
+    cur = MAPS.village; player.x = state.x; player.y = state.y; player.dir = 'down';
+    $('#place').textContent = cur.label;
+    save();
+    if (mode === 'journal') { renderJournal(); toast('Fresh start. Everyone in Thistlewick has forgotten you. Gently.'); }
+    else beginGame();
+  });
+}
+
+function syncSound() { $('#btnSound').textContent = state.sound ? 'Sound on' : 'Sound off'; }
+$('#btnSound').addEventListener('click', () => { state.sound = !state.sound; syncSound(); save(); });
+
+/* ============================================================
+   Title + boot
+   ============================================================ */
+function beginGame() {
+  const nm = $('#playerName').value.trim();
+  if (nm) state.name = nm;
+  const first = !state.started;
+  state.started = true;
+  $('#title').hidden = true; $('#hud').hidden = false; $('#touch').hidden = !isTouch;
+  mode = 'play';
+  syncSound();
+  tone(392, 0.15, 0.03, 'triangle'); tone(523, 0.2, 0.03, 'triangle', 0.1);
+  save();
+  if (first) toast('Welcome to Thistlewick. Start with the notice board in the village square.', 5500);
+}
+$('#btnBegin').addEventListener('click', beginGame);
+$('#playerName').addEventListener('keydown', e => { if (e.key === 'Enter') beginGame(); });
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  update(dt); render();
+  requestAnimationFrame(frame);
+}
+
+function start(data) {
+  const saved = (data && data.state) || loadSaved();
+  if (saved) state = saved;
+  cur = MAPS[state.map] || MAPS.village;
+  player.x = state.x; player.y = state.y; player.dir = state.dir || 'down';
+  if (cur !== MAPS.village && !cur.returnTo) {
+    const h = MAPS.village.objs.find(o => o.enter === cur.id);
+    if (h) cur.returnTo = { x: h.door.x * TILE + 8, y: (h.door.y + 1) * TILE + 10 };
+  }
+  $('#place').textContent = cur.label;
+  if (state.name) $('#playerName').value = state.name;
+  if (state.started) {
+    $('#btnBegin').textContent = 'Continue';
+    const rb = $('#btnReset'); rb.hidden = false; armReset(rb, 'Tap again to erase your save');
+  }
+  syncSound();
+  updateBadge();
+  requestAnimationFrame(t => { last = t; frame(t); });
+
+  (async () => {
+    try { sample = (window.claude && window.claude.use) ? await window.claude.use('sample') : null; }
+    catch { sample = null; }
+    updateBadge();
+  })();
+}
+
+const hot = window.claude && window.claude.hot;
+if (hot && typeof hot.snapshot === 'function') { try { hot.snapshot(() => { save(); return { state }; }); } catch {} }
+if (hot && typeof hot.ready === 'function') hot.ready(start); else start((hot && hot.data) || {});
+})();
+</script>
