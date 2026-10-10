@@ -41,6 +41,8 @@ button{cursor:pointer}
 .hud-right{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .pill-btn{background:var(--ink);border:2px solid var(--chalk);padding:7px 10px}
 .pill-btn:hover{background:#221d2b}
+#badge{display:inline-flex;align-items:center;gap:8px}
+#badge:disabled{opacity:.7;cursor:wait}
 .dot{width:8px;height:8px;background:var(--mute);display:inline-block}
 .dot.live{background:var(--sprout);box-shadow:0 0 0 2px rgba(148,211,107,.25)}
 #hint{position:absolute;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);white-space:nowrap}
@@ -185,7 +187,7 @@ button{cursor:pointer}
   <div class="hud" id="hud" hidden>
     <div class="pill tag" id="place">Thistlewick</div>
     <div class="hud-right">
-      <span class="pill tag" id="badge" title=""><i class="dot" id="badgeDot"></i><span id="badgeText">Scripted replies</span></span>
+      <button type="button" class="pill-btn tag" id="badge" aria-pressed="false" title=""><i class="dot" id="badgeDot"></i><span id="badgeText">Scripted replies</span></button>
       <button class="pill-btn tag" id="btnSound" type="button">Sound on</button>
       <button class="pill-btn tag" id="btnJournal" type="button">Journal (J)</button>
     </div>
@@ -436,7 +438,7 @@ const SAVE_KEY = 'listening-thistlewick-v1';
 function freshState() {
   const v = {};
   for (const id of ORDER) v[id] = { stage: 0, met: false, turns: [], coach: '', g: 0, a: 0 };
-  return { map: 'village', x: 13 * TILE + 8, y: 8 * TILE + 12, dir: 'down', name: '', coach: true, sound: true,
+  return { map: 'village', x: 13 * TILE + 8, y: 8 * TILE + 12, dir: 'down', name: '', coach: true, sound: true, useClaude: true,
     replies: 0, passed: 0, skills: {}, keepsakes: [], v, started: false };
 }
 let state = freshState();
@@ -1500,7 +1502,50 @@ function toast(msg, ms = 4200) {
    With Claude (on claude.ai) it reads the reply and writes the
    villager's words. Elsewhere a simple keyword check stands in.
    ============================================================ */
-let sample = null, claudeOff = false;
+let sample = null, claudeOff = false, offReason = null, perms = null, badgeBusy = false;
+const isLive = () => !!sample && !claudeOff && state.useClaude !== false;
+
+// The badge doubles as a toggle: live -> scripted, scripted -> ask for Claude again.
+async function toggleClaude() {
+  if (badgeBusy) return;
+  if (isLive()) {
+    state.useClaude = false; save(); updateBadge();
+    toast('Switched to scripted replies. Click the badge again to bring Claude back.');
+    return;
+  }
+  if (!sample) {
+    toast('Claude can\'t be reached from this page. Sign in to claude.ai, open the game from its claude.ai link, then reload.', 6500);
+    return;
+  }
+  if (offReason === 'disabled') { toast('Claude isn\'t available for this account, so replies stay scripted.'); return; }
+  badgeBusy = true; $('#badge').disabled = true; $('#badgeText').textContent = 'Asking...';
+  try {
+    if (!perms) { try { perms = window.claude && window.claude.use ? await window.claude.use('permissions') : null; } catch { perms = null; } }
+    let st = 'prompt';
+    if (perms) {
+      st = await perms.state('sample');
+      if (st === 'prompt') st = (await perms.request(['sample'])).sample || 'prompt';
+      else if (st === 'denied') {
+        try { await perms.manage(); }
+        catch { toast('Open the Permissions menu on this game\'s page, allow Claude, then click the badge again.', 6500); }
+        st = await perms.state('sample');
+      }
+    }
+    if (st === 'granted' || (!perms && st === 'prompt')) {
+      state.useClaude = true; claudeOff = false; offReason = null; save();
+      toast(st === 'granted' ? 'Claude is listening. Villagers will answer in their own words.' : 'Claude will ask for permission the next time a villager replies.');
+    } else if (st === 'unavailable') {
+      toast('Claude isn\'t available on this page, so replies stay scripted.');
+    } else if (st === 'prompt') {
+      toast('No problem. Click the badge whenever you want to try Claude again.');
+    } else {
+      toast('Claude is still off for this game. You can allow it from the page\'s Permissions menu.', 6000);
+    }
+  } finally {
+    badgeBusy = false; $('#badge').disabled = false; updateBadge();
+  }
+}
+$('#badge').addEventListener('click', toggleClaude);
 
 const OPINION_RULE = [
   n => `Trust is new: opinions, advice and the player's own stories fail here, unless it is one short clause that immediately hands attention back to ${n}.`,
@@ -1556,7 +1601,7 @@ Reply with only this JSON:
 }
 
 async function judge(c, v, text) {
-  if (sample && !claudeOff) {
+  if (isLive()) {
     thinkCtl = new AbortController();
     try {
       const r = await sample.json(buildPrompt(c, v, text), { modelTier: 'default', effort: 'low', cache: false, signal: thinkCtl.signal });
@@ -1566,9 +1611,12 @@ async function judge(c, v, text) {
       thinkCtl = null;
       const code = e && e.code;
       if (code === 'cancelled') throw e;
-      if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(code)) {
-        claudeOff = true; updateBadge();
-        toast('Claude isn\'t available here, so villagers will use their scripted lines.');
+      if (code === 'not_granted') {
+        claudeOff = true; offReason = 'denied'; updateBadge();
+        toast('Claude is off for this game, so villagers will use scripted lines. Click the "Scripted replies" badge to turn Claude back on.', 6500);
+      } else if (['sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(code)) {
+        claudeOff = true; offReason = 'disabled'; updateBadge();
+        toast('Claude isn\'t available for this account, so villagers will use their scripted lines.');
       } else if (code === 'rate_limited') toast('Claude needs a break (usage limit reached). This reply uses the scripted check.');
       else if (code === 'session_expired') toast('Sign in to claude.ai again to bring Claude back. Using the scripted check for now.');
       else toast('Couldn\'t reach Claude just now. This reply uses the scripted check.');
@@ -1672,15 +1720,20 @@ function judgeLocal(c, v, text) {
 }
 
 function updateBadge() {
-  const live = !!sample && !claudeOff;
+  const live = isLive();
   $('#badgeDot').classList.toggle('live', live);
-  $('#badgeText').textContent = live ? 'Claude is listening' : 'Scripted replies';
+  $('#badge').setAttribute('aria-pressed', String(live));
+  if (!badgeBusy) $('#badgeText').textContent = live ? 'Claude is listening' : 'Scripted replies';
   $('#badge').title = live
-    ? 'Claude reads each reply and writes what villagers say. It uses your own Claude account.'
-    : 'Claude isn\'t available here, so a simple word check judges replies and villagers use scripted lines.';
+    ? 'Claude reads each reply and writes what villagers say, using your own Claude account. Click to switch to scripted replies.'
+    : sample
+      ? 'Villagers are using scripted lines. Click to turn Claude back on.'
+      : 'Claude can\'t be reached from this page, so villagers use scripted lines. Click for help.';
   $('#claudeNote').textContent = live
-    ? 'On claude.ai, Claude reads each reply and voices the villagers, using your Claude account. You\'ll be asked once to allow it.'
-    : 'Claude isn\'t available here, so villagers use scripted lines and a simpler word check. Open this game on claude.ai for live replies.';
+    ? 'On claude.ai, Claude reads each reply and voices the villagers, using your Claude account. You\'ll be asked once to allow it. You can switch to scripted replies with the badge in the top corner.'
+    : sample
+      ? 'Villagers are using scripted lines. Click the "Scripted replies" badge in the top corner to turn Claude on.'
+      : 'Claude can\'t be reached here, so villagers use scripted lines and a simpler word check. Sign in to claude.ai and open the game\'s claude.ai link for live replies.';
 }
 
 /* ============================================================
