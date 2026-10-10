@@ -1503,18 +1503,25 @@ function toast(msg, ms = 4200) {
    villager's words. Elsewhere a simple keyword check stands in.
    ============================================================ */
 let sample = null, claudeOff = false, offReason = null, perms = null, badgeBusy = false;
+let sampleChecked = false, sampleP = null; // claude.use('sample') answers a moment after load
 const isLive = () => !!sample && !claudeOff && state.useClaude !== false;
 
 // The badge doubles as a toggle: live -> scripted, scripted -> ask for Claude again.
 async function toggleClaude() {
   if (badgeBusy) return;
+  if (!sampleChecked && sampleP) {
+    badgeBusy = true; $('#badge').disabled = true; $('#badgeText').textContent = 'Connecting...';
+    await sampleP;
+    badgeBusy = false; $('#badge').disabled = false; updateBadge();
+    if (isLive()) { toast('Claude is listening. Villagers will answer in their own words.'); return; }
+  }
   if (isLive()) {
     state.useClaude = false; save(); updateBadge();
     toast('Switched to scripted replies. Click the badge again to bring Claude back.');
     return;
   }
   if (!sample) {
-    toast('Claude can\'t be reached from this page. Sign in to claude.ai, open the game from its claude.ai link, then reload.', 6500);
+    toast('Claude isn\'t available in this view. Open the game\'s claude.ai link in a regular browser tab while signed in, then reload. Some accounts can\'t use Claude in shared pages yet.', 8000);
     return;
   }
   if (offReason === 'disabled') { toast('Claude isn\'t available for this account, so replies stay scripted.'); return; }
@@ -1601,6 +1608,7 @@ Reply with only this JSON:
 }
 
 async function judge(c, v, text) {
+  if (!sampleChecked && sampleP) await sampleP;
   if (isLive()) {
     thinkCtl = new AbortController();
     try {
@@ -1720,6 +1728,13 @@ function judgeLocal(c, v, text) {
 }
 
 function updateBadge() {
+  if (!sampleChecked) {
+    $('#badgeDot').classList.remove('live');
+    if (!badgeBusy) $('#badgeText').textContent = 'Connecting...';
+    $('#badge').title = 'Checking whether Claude can voice the villagers.';
+    $('#claudeNote').textContent = 'Checking whether Claude can voice the villagers...';
+    return;
+  }
   const live = isLive();
   $('#badgeDot').classList.toggle('live', live);
   $('#badge').setAttribute('aria-pressed', String(live));
@@ -1886,9 +1901,10 @@ function start(data) {
   updateBadge();
   requestAnimationFrame(t => { last = t; frame(t); });
 
-  (async () => {
+  sampleP = (async () => {
     try { sample = (window.claude && window.claude.use) ? await window.claude.use('sample') : null; }
     catch { sample = null; }
+    sampleChecked = true;
     updateBadge();
   })();
 }
